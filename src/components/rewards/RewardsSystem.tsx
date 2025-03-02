@@ -341,7 +341,15 @@ const RewardsSystem = () => {
         'Recycle items with food residue',
         'Include plastic bags with rigid plastics',
         'Recycle styrofoam with regular plastics'
-      ]
+      ],
+      recyclingSymbols: [
+        { number: '1', name: 'PET', items: 'Soda bottles, water bottles', recyclability: 'Highly recyclable' },
+        { number: '2', name: 'HDPE', items: 'Milk jugs, detergent bottles', recyclability: 'Widely recyclable' },
+        { number: '3', name: 'PVC', items: 'Pipes, shower curtains', recyclability: 'Limited recyclability' },
+        { number: '4', name: 'LDPE', items: 'Plastic bags, squeeze bottles', recyclability: 'Increasingly recyclable' },
+        { number: '5', name: 'PP', items: 'Yogurt containers, bottle caps', recyclability: 'Moderately recyclable' }
+      ],
+      environmentalImpact: 'Plastic waste is a major contributor to ocean pollution, affecting marine life and ecosystems. Microplastics have been found in drinking water, food, and even human blood.'
     },
     {
       id: 'paper',
@@ -352,19 +360,28 @@ const RewardsSystem = () => {
       bgColor: 'bg-eco-paper/20',
       icon: '📄',
       description: 'Paper products are among the most recyclable materials. Recycling paper saves trees, water, and energy while reducing landfill waste.',
-      examples: ['Newspapers', 'Magazines', 'Cardboard boxes', 'Office paper', 'Paper bags'],
+      examples: ['Newspapers', 'Magazines', 'Cardboard boxes', 'Office paper', 'Paper bags', 'Envelopes', 'Notebooks', 'Brochures'],
       doItems: [
         'Keep paper clean and dry',
         'Flatten cardboard boxes',
         'Remove plastic windows from envelopes',
-        'Separate glossy paper if required'
+        'Separate glossy paper if required',
+        'Remove staples and paper clips when possible'
       ],
       dontItems: [
         'Recycle greasy or food-stained paper',
         'Include paper towels or tissues',
         'Mix paper with other materials',
-        'Recycle waxed or laminated paper'
-      ]
+        'Recycle waxed or laminated paper',
+        'Include thermal receipt paper with regular paper'
+      ],
+      paperTypes: [
+        { type: 'Cardboard', recyclability: 'Highly recyclable', notes: 'Flatten to save space' },
+        { type: 'Newspaper', recyclability: 'Highly recyclable', notes: 'Keep dry and clean' },
+        { type: 'Office Paper', recyclability: 'Highly recyclable', notes: 'Remove staples if possible' },
+        { type: 'Glossy Magazines', recyclability: 'Recyclable', notes: 'May need to be separated in some areas' }
+      ],
+      environmentalImpact: 'Recycling one ton of paper saves approximately 17 trees, 7,000 gallons of water, and 463 gallons of oil. It also reduces greenhouse gas emissions compared to producing new paper.'
     },
     {
       id: 'glass',
@@ -375,19 +392,27 @@ const RewardsSystem = () => {
       bgColor: 'bg-eco-glass/20',
       icon: '🥛',
       description: 'Glass is 100% recyclable and can be recycled endlessly without loss in quality or purity. Recycling glass reduces landfill waste and saves energy.',
-      examples: ['Bottles', 'Jars', 'Glass containers', 'Beverage glasses'],
+      examples: ['Bottles', 'Jars', 'Glass containers', 'Beverage glasses', 'Food jars', 'Wine bottles', 'Beer bottles', 'Sauce jars'],
       doItems: [
         'Rinse thoroughly to remove residue',
         'Remove lids and caps (recycle separately)',
         'Sort by color if required locally',
-        'Keep intact when possible'
+        'Keep intact when possible',
+        'Remove labels if your program requires it'
       ],
       dontItems: [
         'Mix with ceramics or porcelain',
         'Include light bulbs or window glass',
         'Recycle broken glass without proper containment',
-        'Include mirrors or tempered glass'
-      ]
+        'Include mirrors or tempered glass',
+        'Mix different colored glass if separation is required'
+      ],
+      glassColors: [
+        { color: 'Clear', uses: 'Food jars, beverage bottles', notes: 'Most versatile for recycling' },
+        { color: 'Green', uses: 'Wine bottles, some beverage bottles', notes: 'Commonly recycled' },
+        { color: 'Brown/Amber', uses: 'Beer bottles, medicine bottles', notes: 'Protects contents from light damage' }
+      ],
+      environmentalImpact: 'Recycling glass reduces the need for raw materials, lowers energy consumption in manufacturing, and decreases CO2 emissions. Glass in landfills never decomposes.'
     },
     {
       id: 'metal',
@@ -398,19 +423,28 @@ const RewardsSystem = () => {
       bgColor: 'bg-eco-metal/20',
       icon: '🥫',
       description: 'Metals are valuable recyclables that can be reprocessed indefinitely. Recycling metals conserves natural resources and reduces energy consumption.',
-      examples: ['Aluminum cans', 'Food tins', 'Metal bottle caps', 'Foil', 'Metal containers'],
+      examples: ['Aluminum cans', 'Food tins', 'Metal bottle caps', 'Foil', 'Metal containers', 'Steel cans', 'Aerosol cans (empty)', 'Metal lids'],
       doItems: [
         'Rinse food residue thoroughly',
         'Crush cans to save space',
         'Remove paper labels when possible',
-        'Separate different types of metals'
+        'Separate different types of metals',
+        'Make sure aerosol cans are completely empty'
       ],
       dontItems: [
-        'Include aerosol cans (unless empty)',
+        'Include aerosol cans with contents',
         'Mix with non-metal materials',
         'Recycle items with hazardous residue',
-        'Include electronics with regular metals'
-      ]
+        'Include electronics with regular metals',
+        'Recycle pressurized containers that aren\'t empty'
+      ],
+      metalTypes: [
+        { type: 'Aluminum', examples: 'Beverage cans, foil', notes: 'Highly valuable for recycling' },
+        { type: 'Steel/Tin', examples: 'Food cans, soup cans', notes: 'Magnetic and widely recycled' },
+        { type: 'Copper', examples: 'Wiring, pipes', notes: 'High value, take to scrap yards' },
+        { type: 'Mixed/Other', examples: 'Bottle caps, metal lids', notes: 'Collect small items together' }
+      ],
+      environmentalImpact: 'Recycling aluminum uses 95% less energy than producing new aluminum from raw materials. Metal recycling significantly reduces mining impacts and greenhouse gas emissions.'
     },
     {
       id: 'organic',
@@ -421,19 +455,26 @@ const RewardsSystem = () => {
       bgColor: 'bg-amber-500/20',
       icon: '🍎',
       description: 'Organic waste can be composted to create nutrient-rich soil. Composting reduces methane emissions from landfills and returns nutrients to the earth.',
-      examples: ['Food scraps', 'Yard waste', 'Coffee grounds', 'Eggshells', 'Plant trimmings'],
+      examples: ['Food scraps', 'Yard waste', 'Coffee grounds', 'Eggshells', 'Plant trimmings', 'Fruit peels', 'Vegetable scraps', 'Tea bags'],
       doItems: [
         'Chop larger items for faster decomposition',
         'Mix green (nitrogen-rich) and brown (carbon-rich) materials',
         'Keep compost moist but not soggy',
-        'Turn compost regularly for aeration'
+        'Turn compost regularly for aeration',
+        'Include a variety of materials for balanced nutrients'
       ],
       dontItems: [
         'Include meat or dairy in home composting',
         'Add diseased plants to compost',
         'Include pet waste in food compost',
-        'Add glossy or colored paper'
-      ]
+        'Add glossy or colored paper',
+        'Include oils, fats, or greasy foods'
+      ],
+      compostTypes: [
+        { type: 'Greens (Nitrogen-rich)', examples: 'Fresh grass clippings, food scraps, coffee grounds', notes: 'Provides protein for microorganisms' },
+        { type: 'Browns (Carbon-rich)', examples: 'Dry leaves, cardboard, newspaper, wood chips', notes: 'Provides energy for microorganisms' }
+      ],
+      environmentalImpact: 'When organic waste decomposes in landfills, it produces methane, a potent greenhouse gas. Composting prevents these emissions while creating valuable soil amendments that reduce the need for chemical fertilizers.'
     }
   ];
   
@@ -569,37 +610,52 @@ const RewardsSystem = () => {
                   .map(category => (
                     <div 
                       key={category.id} 
-                      className={`border-2 ${category.borderColor} rounded-lg overflow-hidden`}
+                      className={`border-2 ${category.borderColor} rounded-lg overflow-hidden shadow-lg`}
                     >
-                      <div className={`${category.bgColor} p-4`}>
-                        <div className="flex items-center mb-2">
-                          <span className="text-2xl mr-3">{category.icon}</span>
-                          <h3 className={`text-xl font-semibold ${category.textColor}`}>
+                      <div className={`${category.bgColor} p-6`}>
+                        <div className="flex items-center mb-3">
+                          <span className="text-3xl mr-4">{category.icon}</span>
+                          <h3 className={`text-2xl font-bold ${category.textColor}`}>
                             {category.name} Waste
                           </h3>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4">
+                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                           {category.description}
                         </p>
                         
                         <div className="mb-4">
-                          <h4 className="text-sm font-medium mb-2">Common Examples:</h4>
+                          <h4 className="text-sm font-medium mb-2 uppercase tracking-wider">Common Examples:</h4>
                           <div className="flex flex-wrap gap-2">
                             {category.examples.map((example, i) => (
                               <span 
                                 key={i} 
-                                className="bg-white/60 px-3 py-1 rounded-full text-xs"
+                                className="bg-white/70 backdrop-blur-sm px-3 py-1 rounded-full text-xs shadow-sm"
                               >
                                 {example}
                               </span>
                             ))}
                           </div>
                         </div>
+                        
+                        {/* Environmental Impact Section */}
+                        <div className="bg-white/40 backdrop-blur-sm rounded-lg p-3 mb-4">
+                          <h4 className="text-sm font-medium mb-1 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-globe mr-2">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="2" y1="12" x2="22" y2="12"></line>
+                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                            Environmental Impact
+                          </h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {category.environmentalImpact}
+                          </p>
+                        </div>
                       </div>
                       
-                      <div className="p-4 bg-white">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
+                      <div className="p-6 bg-white">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="bg-green-50 rounded-lg p-4 border border-green-100">
                             <h4 className="text-sm font-medium flex items-center text-green-600 mb-3">
                               <div className="p-1 bg-green-100 rounded-full mr-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check">
@@ -620,7 +676,7 @@ const RewardsSystem = () => {
                             </ul>
                           </div>
                           
-                          <div>
+                          <div className="bg-red-50 rounded-lg p-4 border border-red-100">
                             <h4 className="text-sm font-medium flex items-center text-red-600 mb-3">
                               <div className="p-1 bg-red-100 rounded-full mr-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
@@ -644,8 +700,120 @@ const RewardsSystem = () => {
                           </div>
                         </div>
                         
-                        <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                          <h4 className="text-sm font-medium flex items-center mb-2">
+                        {/* Additional Information Section */}
+                        {category.id === 'plastic' && (
+                          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                            <h4 className="text-sm font-medium flex items-center mb-3 text-blue-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-info mr-2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                              </svg>
+                              Plastic Recycling Symbols
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {category.recyclingSymbols.map((symbol, i) => (
+                                <div key={i} className="bg-white p-2 rounded border border-blue-50 text-xs">
+                                  <div className="font-semibold mb-1">#{symbol.number} - {symbol.name}</div>
+                                  <div><span className="text-muted-foreground">Examples:</span> {symbol.items}</div>
+                                  <div><span className="text-muted-foreground">Recyclability:</span> {symbol.recyclability}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {category.id === 'paper' && (
+                          <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+                            <h4 className="text-sm font-medium flex items-center mb-3 text-yellow-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file mr-2">
+                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                              </svg>
+                              Paper Types & Recyclability
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {category.paperTypes.map((type, i) => (
+                                <div key={i} className="bg-white p-2 rounded border border-yellow-50 text-xs">
+                                  <div className="font-semibold mb-1">{type.type}</div>
+                                  <div><span className="text-muted-foreground">Recyclability:</span> {type.recyclability}</div>
+                                  <div><span className="text-muted-foreground">Notes:</span> {type.notes}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {category.id === 'glass' && (
+                          <div className="mt-6 p-4 bg-teal-50 rounded-lg border border-teal-100">
+                            <h4 className="text-sm font-medium flex items-center mb-3 text-teal-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wine mr-2">
+                                <path d="M8 22h8"></path>
+                                <path d="M7 10h10"></path>
+                                <path d="M12 15v7"></path>
+                                <path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path>
+                              </svg>
+                              Glass Colors & Uses
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              {category.glassColors.map((glassColor, i) => (
+                                <div key={i} className="bg-white p-2 rounded border border-teal-50 text-xs">
+                                  <div className="font-semibold mb-1">{glassColor.color}</div>
+                                  <div><span className="text-muted-foreground">Uses:</span> {glassColor.uses}</div>
+                                  <div><span className="text-muted-foreground">Notes:</span> {glassColor.notes}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {category.id === 'metal' && (
+                          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <h4 className="text-sm font-medium flex items-center mb-3 text-gray-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-hammer mr-2">
+                                <path d="m15 12-8.5 8.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L12 9"></path>
+                                <path d="M17.64 15 22 10.64"></path>
+                                <path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h2.47l2.26 1.91"></path>
+                              </svg>
+                              Metal Types & Recyclability
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {category.metalTypes.map((type, i) => (
+                                <div key={i} className="bg-white p-2 rounded border border-gray-100 text-xs">
+                                  <div className="font-semibold mb-1">{type.type}</div>
+                                  <div><span className="text-muted-foreground">Examples:</span> {type.examples}</div>
+                                  <div><span className="text-muted-foreground">Notes:</span> {type.notes}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {category.id === 'organic' && (
+                          <div className="mt-6 p-4 bg-lime-50 rounded-lg border border-lime-100">
+                            <h4 className="text-sm font-medium flex items-center mb-3 text-lime-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sprout mr-2">
+                                <path d="M7 20h10"></path>
+                                <path d="M10 20c5.5-2.5.8-6.4 3-10"></path>
+                                <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"></path>
+                                <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"></path>
+                              </svg>
+                              Compost Material Types
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {category.compostTypes.map((type, i) => (
+                                <div key={i} className="bg-white p-2 rounded border border-lime-50 text-xs">
+                                  <div className="font-semibold mb-1">{type.type}</div>
+                                  <div><span className="text-muted-foreground">Examples:</span> {type.examples}</div>
+                                  <div><span className="text-muted-foreground">Notes:</span> {type.notes}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                          <h4 className="text-sm font-medium flex items-center mb-2 text-purple-700">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-lightbulb mr-2">
                               <line x1="9" y1="18" x2="15" y2="18"></line>
                               <line x1="10" y1="22" x2="14" y2="22"></line>
@@ -653,19 +821,19 @@ const RewardsSystem = () => {
                             </svg>
                             Pro Tip
                           </h4>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground leading-relaxed">
                             {(() => {
                               switch(category.id) {
                                 case 'plastic':
-                                  return 'Look for the recycling number (1-7) on plastic items to identify the type of plastic and its recyclability in your area.';
+                                  return 'Look for the recycling number (1-7) on plastic items to identify the type of plastic and its recyclability in your area. Consider using a reusable water bottle instead of disposable plastic bottles to reduce waste significantly.';
                                 case 'paper':
-                                  return 'Shred sensitive documents before recycling, but check if your local facility accepts shredded paper, as it may require special handling.';
+                                  return 'Shred sensitive documents before recycling, but check if your local facility accepts shredded paper, as it may require special handling. Consider using digital documents when possible to reduce paper consumption altogether.';
                                 case 'glass':
-                                  return 'Some recycling programs require separating glass by color (clear, green, brown) to maintain quality in the recycling process.';
+                                  return 'Some recycling programs require separating glass by color (clear, green, brown) to maintain quality in the recycling process. Glass can be recycled indefinitely without loss of quality, making it one of the most sustainable packaging materials.';
                                 case 'metal':
-                                  return 'Small metal items like bottle caps can be collected in a larger metal container like a tin can so they don\'t get lost in the recycling process.';
+                                  return 'Small metal items like bottle caps can be collected in a larger metal container like a tin can so they don\'t get lost in the recycling process. The energy saved by recycling one aluminum can is enough to run a TV for three hours!';
                                 case 'organic':
-                                  return 'Start with a small compost bin in your kitchen for food scraps, then transfer to a larger outdoor compost pile or bin regularly.';
+                                  return 'Start with a small compost bin in your kitchen for food scraps, then transfer to a larger outdoor compost pile or bin regularly. A balanced compost needs both "green" (nitrogen-rich) and "brown" (carbon-rich) materials in roughly equal amounts.';
                                 default:
                                   return '';
                               }

@@ -42,8 +42,8 @@ To access the admin dashboard:
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/eco-friendly-navigator.git
-cd eco-friendly-navigator
+git clone https://github.com/yourusername/EcoTrack.git
+cd EcoTrack
 ```
 
 2. Install dependencies

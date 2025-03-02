@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -40,7 +39,7 @@ const HomeScreen = () => {
       title: 'Waste Segregation',
       description: 'Learn how to properly sort different types of waste',
       icon: <Recycle className="w-6 h-6 text-eco-leaf" />,
-      path: '/segregation',
+      path: '/waste-classification',
       color: 'bg-eco-leafLight/20',
       iconBg: 'bg-eco-leaf/10'
     },

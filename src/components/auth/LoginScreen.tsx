@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LucideLeaf, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -65,8 +64,13 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 bg-primary text-primary-foreground p-3 rounded-full inline-flex">
-            <LucideLeaf className="h-8 w-8" />
+          <div className="mx-auto mb-4 p-3 rounded-full inline-flex relative">
+            {/* Glowing effect */}
+            <div className="absolute inset-0 rounded-full bg-primary/30 blur-md animate-pulse"></div>
+            {/* Updated logo with circular mask */}
+            <div className="h-12 w-12 relative z-10 overflow-hidden rounded-full">
+              <img src="/1.png" alt="EcoTrack Logo" className="w-full h-full object-cover" />
+            </div>
           </div>
           <CardTitle className="text-2xl">Welcome to EcoTrack</CardTitle>
           <CardDescription>Your sustainable waste management companion</CardDescription>

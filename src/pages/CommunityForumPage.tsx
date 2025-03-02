@@ -7,7 +7,7 @@ const CommunityForumPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50">
       <Helmet>
-        <title>Community Forum | Eco-Friendly Navigator</title>
+        <title>Community Forum | EcoTrack</title>
         <meta name="description" content="Join our community forum to discuss waste management, recycling tips, and environmental conservation." />
       </Helmet>
       

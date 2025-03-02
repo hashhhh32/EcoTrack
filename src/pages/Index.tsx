@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LucideLeaf, Recycle, MapPin, Trophy, AlertTriangle, UserCircle, LogIn, Image, Trash, LogOut } from "lucide-react";
+import { LucideLeaf, Recycle, MapPin, Trophy, AlertTriangle, UserCircle, LogIn, Image, Trash, LogOut, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import LoginScreen from "@/components/auth/LoginScreen";
@@ -158,10 +158,11 @@ const Index = () => {
 
         <section className="mb-8 animate-enter delay-200">
           <Tabs defaultValue="segregation" className="w-full">
-            <TabsList className="w-full grid grid-cols-3 mb-4">
+            <TabsList className="w-full grid grid-cols-4 mb-4">
               <TabsTrigger value="segregation">Waste Guide</TabsTrigger>
               <TabsTrigger value="collection">Collection</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="rewards">Rewards</TabsTrigger>
             </TabsList>
             <TabsContent value="segregation">
               <Card className="border-2 hover:border-primary/30 transition-all duration-300">
@@ -213,30 +214,101 @@ const Index = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+            <TabsContent value="rewards">
+              <Card className="border-2 hover:border-primary/30 transition-all duration-300">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center">
+                    <Trophy className="mr-2 h-5 w-5 text-amber-500" />
+                    Your Reward Points
+                  </CardTitle>
+                  <CardDescription>Track your eco-friendly achievements</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-2xl font-bold text-primary">350</h3>
+                      <p className="text-sm text-muted-foreground">Total Eco Points</p>
+                    </div>
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                      Level 3: Eco Warrior
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium">Next Reward: Eco-friendly Water Bottle</span>
+                        <span className="text-xs">450 points</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div className="bg-primary h-2 rounded-full" style={{ width: '78%' }}></div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">100 more points needed</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="border rounded-lg p-3 text-center">
+                        <h4 className="text-sm font-medium mb-1">Recent Activity</h4>
+                        <p className="text-xs text-muted-foreground">+25 points for waste classification</p>
+                      </div>
+                      <div className="border rounded-lg p-3 text-center">
+                        <h4 className="text-sm font-medium mb-1">Badges Earned</h4>
+                        <p className="text-xs text-muted-foreground">5 of 12 badges unlocked</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button variant="outline" className="w-full mt-4 text-sm">
+                    <Trophy className="mr-2 h-4 w-4" />
+                    View All Rewards
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </section>
 
         <section className="animate-enter delay-300">
           <Card className="border-2 hover:border-primary/30 transition-all duration-300">
             <CardHeader>
-              <CardTitle>Your Eco Impact</CardTitle>
-              <CardDescription>Track your contribution to a cleaner environment</CardDescription>
+              <CardTitle>NGO Drive</CardTitle>
+              <CardDescription>Join upcoming environmental initiatives and volunteer opportunities</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-primary/10 rounded-lg">
-                  <div className="text-3xl font-bold text-primary">127 kg</div>
-                  <div className="text-sm text-muted-foreground">Waste Recycled</div>
+              <div className="space-y-4">
+                <div className="p-4 border rounded-lg hover:shadow-md transition-all duration-300 bg-gradient-to-r from-green-50 to-blue-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-primary">Beach Cleanup Drive</h3>
+                    <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">This Weekend</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Join us for a community beach cleanup event. Help remove plastic waste from our shores and protect marine life.</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">25 volunteers joined</span>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      Register
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-center p-4 bg-secondary/10 rounded-lg">
-                  <div className="text-3xl font-bold text-secondary">350</div>
-                  <div className="text-sm text-muted-foreground">Eco Points</div>
+                
+                <div className="p-4 border rounded-lg hover:shadow-md transition-all duration-300 bg-gradient-to-r from-amber-50 to-orange-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-secondary">Tree Planting Initiative</h3>
+                    <span className="text-xs bg-secondary/20 text-secondary px-2 py-1 rounded-full">Next Month</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Help us restore local forests by planting native tree species. Each tree planted helps combat climate change.</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">500 trees goal</span>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      Sign Up
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div className="mt-6 p-4 rounded-lg bg-muted text-center">
-                <p className="text-sm text-muted-foreground">You've helped save approximately</p>
-                <h4 className="text-lg font-semibold mb-1">23 kg of CO2 emissions</h4>
-                <p className="text-xs text-muted-foreground">equivalent to planting 2 trees</p>
+              
+              <div className="mt-4 text-center">
+                <Button variant="link" className="text-sm">
+                  View all environmental initiatives
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -250,8 +322,8 @@ const Index = () => {
             <NavItem icon={<LucideLeaf />} label="Home" isActive />
             <NavItem icon={<Recycle />} label="Segregate" onClick={() => navigate("/waste-classification")} />
             <NavItem icon={<Trash />} label="Complaint" onClick={() => navigate("/complaint")} />
-            <NavItem icon={<Trophy />} label="Rewards" />
-            <NavItem icon={<UserCircle />} label="Profile" onClick={() => navigate("/profile")} />
+            <NavItem icon={<Users />} label="NGO Drives" onClick={() => navigate("/ngo-drives")} />
+            <NavItem icon={<Trophy />} label="Rewards" onClick={() => navigate("/rewards")} />
           </ul>
         </div>
       </nav>

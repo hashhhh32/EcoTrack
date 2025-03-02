@@ -47,6 +47,57 @@ const ComplaintPage = () => {
     }
   }, []);
 
+  // Check for resolved complaints and show notifications
+  useEffect(() => {
+    if (!user) return;
+    
+    const checkResolvedComplaints = async () => {
+      try {
+        // Fetch recently resolved complaints for this user that have points awarded
+        const { data, error } = await supabase
+          .from("complaints")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("status", "resolved")
+          .is("notification_shown", null) // Only get complaints where notification hasn't been shown
+          .order("resolved_at", { ascending: false });
+          
+        if (error) {
+          console.error("Error fetching resolved complaints:", error);
+          return;
+        }
+        
+        // Show notifications for resolved complaints
+        if (data && data.length > 0) {
+          data.forEach(async (complaint) => {
+            if (complaint.points_awarded) {
+              toast({
+                title: "Complaint Resolved! 🎉",
+                description: `Your complaint has been resolved and you've earned ${complaint.points_awarded} eco points!`,
+                duration: 10000,
+              });
+              
+              // Mark notification as shown
+              await supabase
+                .from("complaints")
+                .update({ notification_shown: true })
+                .eq("id", complaint.id);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error checking resolved complaints:", err);
+      }
+    };
+    
+    checkResolvedComplaints();
+    
+    // Set up interval to check periodically (every 5 minutes)
+    const interval = setInterval(checkResolvedComplaints, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [user, toast]);
+
   const getUserLocation = (): Promise<{ latitude: number; longitude: number }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {

@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Trash, AlertTriangle, Settings, BarChart, MapPin, MessageSquare, Clock, RefreshCw } from "lucide-react";
+import { Users, Trash, AlertTriangle, Settings, BarChart, MapPin, MessageSquare, Clock, RefreshCw, CheckCircle2, Calendar, Tent } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import AdminNavbar from "@/components/admin/AdminNavbar";
 import UserManagement from "@/components/admin/UserManagement";
@@ -23,6 +23,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import NGODrivesManagement from "@/components/admin/NGODrivesManagement";
 
 type Complaint = {
   id: string;
@@ -35,6 +37,12 @@ type Complaint = {
   timestamp?: string;
   latitude?: number;
   longitude?: number;
+  status?: "pending" | "resolved" | "rejected";
+  resolved_at?: string;
+  resolved_by?: string;
+  resolution_notes?: string;
+  points_awarded?: number;
+  notification_shown?: boolean;
 };
 
 // Create a sample complaint for testing if no complaints are found
@@ -48,7 +56,8 @@ const createSampleComplaints = (): Complaint[] => {
       user_id: "sample-user-1",
       location: { latitude: 40.7128, longitude: -74.0060 },
       user_email: "user@example.com",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      status: "pending"
     },
     {
       id: "sample-2",
@@ -58,7 +67,13 @@ const createSampleComplaints = (): Complaint[] => {
       user_id: "sample-user-2",
       location: { latitude: 34.0522, longitude: -118.2437 },
       user_email: "another@example.com",
-      timestamp: new Date(Date.now() - 86400000).toISOString()
+      timestamp: new Date(Date.now() - 86400000).toISOString(),
+      status: "resolved",
+      resolved_at: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+      resolved_by: "admin@ecotrack.com",
+      resolution_notes: "Cleanup team dispatched and waste removed successfully.",
+      points_awarded: 50,
+      notification_shown: true
     }
   ];
 };
@@ -72,6 +87,8 @@ const AdminDashboard = () => {
   const [messages, setMessages] = useState<Complaint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
+  const [resolveDialogOpen, setResolveDialogOpen] = useState<string | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -206,6 +223,137 @@ const AdminDashboard = () => {
     }
   };
 
+  // Function to mark a complaint as resolved
+  const resolveComplaint = async (id: string) => {
+    try {
+      // Skip update for sample data
+      if (id.startsWith("sample-")) {
+        // Just update local state for sample data
+        const updatedComplaints = complaints.map(complaint => 
+          complaint.id === id 
+            ? { 
+                ...complaint, 
+                status: "resolved" as const, 
+                resolved_at: new Date().toISOString(),
+                resolved_by: user?.email || "admin",
+                resolution_notes: resolutionNotes
+              } 
+            : complaint
+        );
+        
+        setComplaints(updatedComplaints);
+        setMessages(updatedComplaints);
+        
+        toast({
+          title: "Complaint resolved (demo)",
+          description: "Complaint has been marked as resolved (sample data)",
+        });
+        
+        return;
+      }
+      
+      // Find the complaint to get the user_id
+      const complaintToResolve = complaints.find(c => c.id === id);
+      if (!complaintToResolve || !complaintToResolve.user_id) {
+        throw new Error("Complaint not found or missing user ID");
+      }
+      
+      // Award points to the user (50 points for resolved complaint)
+      const pointsToAward = 50;
+      
+      // Start a transaction to update both complaints and user points
+      const { error: updateError } = await supabase
+        .from("complaints")
+        .update({
+          status: "resolved" as const,
+          resolved_at: new Date().toISOString(),
+          resolved_by: user?.email,
+          resolution_notes: resolutionNotes,
+          points_awarded: pointsToAward
+        })
+        .eq("id", id);
+
+      if (updateError) throw updateError;
+      
+      // Update user points in the users table or create a points record
+      // First check if user exists in the points table
+      const { data: existingPoints } = await supabase
+        .from("user_points")
+        .select("*")
+        .eq("user_id", complaintToResolve.user_id)
+        .single();
+        
+      if (existingPoints) {
+        // Update existing points
+        const { error: pointsError } = await supabase
+          .from("user_points")
+          .update({
+            total_points: existingPoints.total_points + pointsToAward,
+            last_updated: new Date().toISOString()
+          })
+          .eq("user_id", complaintToResolve.user_id);
+          
+        if (pointsError) throw pointsError;
+      } else {
+        // Create new points record
+        const { error: newPointsError } = await supabase
+          .from("user_points")
+          .insert({
+            user_id: complaintToResolve.user_id,
+            total_points: pointsToAward,
+            last_updated: new Date().toISOString()
+          });
+          
+        if (newPointsError) throw newPointsError;
+      }
+      
+      // Add points history record
+      const { error: historyError } = await supabase
+        .from("points_history")
+        .insert({
+          user_id: complaintToResolve.user_id,
+          points: pointsToAward,
+          action: "Complaint Resolved",
+          description: `Complaint #${id.substring(0, 8)} was resolved`,
+          created_at: new Date().toISOString()
+        });
+        
+      if (historyError) throw historyError;
+
+      // Update local state
+      const updatedComplaints = complaints.map(complaint => 
+        complaint.id === id 
+          ? { 
+              ...complaint, 
+              status: "resolved" as const, 
+              resolved_at: new Date().toISOString(),
+              resolved_by: user?.email || "admin",
+              resolution_notes: resolutionNotes,
+              points_awarded: pointsToAward
+            } 
+          : complaint
+      );
+      
+      setComplaints(updatedComplaints);
+      setMessages(updatedComplaints);
+      
+      toast({
+        title: "Complaint resolved",
+        description: `Complaint has been marked as resolved and user awarded ${pointsToAward} points`,
+      });
+    } catch (error: any) {
+      console.error("Error resolving complaint:", error);
+      toast({
+        title: "Resolution failed",
+        description: error.message || "Failed to resolve complaint",
+        variant: "destructive"
+      });
+    } finally {
+      setResolveDialogOpen(null);
+      setResolutionNotes("");
+    }
+  };
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleString();
@@ -241,10 +389,11 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto">
+          <TabsList className="grid grid-cols-6 w-full max-w-4xl mx-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="complaints">Complaints</TabsTrigger>
             <TabsTrigger value="messages">Messages</TabsTrigger>
+            <TabsTrigger value="ngodrives">NGO Drives</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
@@ -266,13 +415,13 @@ const AdminDashboard = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Active Complaints
+                    Pending Complaints
                   </CardTitle>
                   <AlertTriangle className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {complaints.length}
+                    {complaints.filter(c => c.status === "pending" || !c.status).length}
                   </div>
                 </CardContent>
               </Card>
@@ -280,18 +429,13 @@ const AdminDashboard = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Recent Complaints
+                    Resolved Complaints
                   </CardTitle>
                   <AlertTriangle className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {complaints.filter(c => {
-                      const date = new Date(c.timestamp || c.created_at);
-                      const now = new Date();
-                      const daysDiff = (now.getTime() - date.getTime()) / (1000 * 3600 * 24);
-                      return daysDiff <= 7; // Last 7 days
-                    }).length}
+                    {complaints.filter(c => c.status === "resolved").length}
                   </div>
                 </CardContent>
               </Card>
@@ -383,10 +527,20 @@ const AdminDashboard = () => {
                             <CardTitle className="text-base">
                               Complaint #{complaint.id.substring(0, 8)}
                             </CardTitle>
+                            {complaint.status === "resolved" && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
+                                Resolved
+                              </span>
+                            )}
+                            {(!complaint.status || complaint.status === "pending") && (
+                              <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
+                                Pending
+                              </span>
+                            )}
                           </div>
                           <CardDescription>
                             Submitted by: {complaint.user_email} on{" "}
-                            {new Date(complaint.timestamp).toLocaleString()}
+                            {new Date(complaint.timestamp || complaint.created_at).toLocaleString()}
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="pb-2">
@@ -409,8 +563,63 @@ const AdminDashboard = () => {
                               </span>
                             </div>
                           )}
+                          
+                          {complaint.status === "resolved" && (
+                            <div className="mt-3 p-2 bg-green-50 border border-green-100 rounded-md">
+                              <p className="text-xs font-medium text-green-800">
+                                Resolved by: {complaint.resolved_by || "Admin"} on{" "}
+                                {complaint.resolved_at ? new Date(complaint.resolved_at).toLocaleString() : "N/A"}
+                              </p>
+                              {complaint.resolution_notes && (
+                                <p className="text-xs text-green-700 mt-1">
+                                  Notes: {complaint.resolution_notes}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </CardContent>
                         <CardFooter className="flex justify-end gap-2 pt-0">
+                          {complaint.status !== "resolved" && (
+                            <AlertDialog open={resolveDialogOpen === complaint.id} onOpenChange={(open) => setResolveDialogOpen(open ? complaint.id : null)}>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200"
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                                  Resolve
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Mark complaint as resolved?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will mark the complaint as resolved and notify the user.
+                                    Please provide any resolution details below.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <div className="py-4">
+                                  <Textarea 
+                                    placeholder="Enter resolution details (e.g., 'Cleanup team dispatched', 'Issue addressed')"
+                                    value={resolutionNotes}
+                                    onChange={(e) => setResolutionNotes(e.target.value)}
+                                    className="min-h-[100px]"
+                                  />
+                                </div>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setResolveDialogOpen(null)}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => resolveComplaint(complaint.id)}
+                                    className="bg-green-600 text-white hover:bg-green-700"
+                                  >
+                                    Mark as Resolved
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                          
                           <AlertDialog open={deleteDialogOpen === complaint.id} onOpenChange={(open) => setDeleteDialogOpen(open ? complaint.id : null)}>
                             <AlertDialogTrigger asChild>
                               <Button
@@ -489,9 +698,21 @@ const AdminDashboard = () => {
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="font-medium">{message.user_email}</div>
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Clock className="mr-1 h-3 w-3" />
-                                {formatTimestamp(message.timestamp || message.created_at)}
+                              <div className="flex items-center gap-2">
+                                {message.status === "resolved" && (
+                                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
+                                    Resolved
+                                  </span>
+                                )}
+                                {(!message.status || message.status === "pending") && (
+                                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
+                                    Pending
+                                  </span>
+                                )}
+                                <div className="flex items-center text-xs text-muted-foreground">
+                                  <Clock className="mr-1 h-3 w-3" />
+                                  {formatTimestamp(message.timestamp || message.created_at)}
+                                </div>
                               </div>
                             </div>
                             <div className="rounded-lg bg-muted p-4">
@@ -517,9 +738,63 @@ const AdminDashboard = () => {
                                   </span>
                                 </div>
                               )}
+                              
+                              {message.status === "resolved" && (
+                                <div className="mt-3 p-2 bg-green-50 border border-green-100 rounded-md">
+                                  <p className="text-xs font-medium text-green-800">
+                                    Resolved by: {message.resolved_by || "Admin"} on{" "}
+                                    {message.resolved_at ? new Date(message.resolved_at).toLocaleString() : "N/A"}
+                                  </p>
+                                  {message.resolution_notes && (
+                                    <p className="text-xs text-green-700 mt-1">
+                                      Notes: {message.resolution_notes}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center justify-end">
                               <div className="flex gap-2">
+                                {message.status !== "resolved" && (
+                                  <AlertDialog open={resolveDialogOpen === message.id} onOpenChange={(open) => setResolveDialogOpen(open ? message.id : null)}>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200"
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                                        Resolve
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Mark complaint as resolved?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This will mark the complaint as resolved and notify the user.
+                                          Please provide any resolution details below.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <div className="py-4">
+                                        <Textarea 
+                                          placeholder="Enter resolution details (e.g., 'Cleanup team dispatched', 'Issue addressed')"
+                                          value={resolutionNotes}
+                                          onChange={(e) => setResolutionNotes(e.target.value)}
+                                          className="min-h-[100px]"
+                                        />
+                                      </div>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setResolveDialogOpen(null)}>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => resolveComplaint(message.id)}
+                                          className="bg-green-600 text-white hover:bg-green-700"
+                                        >
+                                          Mark as Resolved
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
                                 <AlertDialog open={deleteDialogOpen === message.id} onOpenChange={(open) => setDeleteDialogOpen(open ? message.id : null)}>
                                   <AlertDialogTrigger asChild>
                                     <Button
@@ -567,6 +842,10 @@ const AdminDashboard = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="ngodrives" className="space-y-4">
+            <NGODrivesManagement />
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">

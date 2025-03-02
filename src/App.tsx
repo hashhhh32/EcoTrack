@@ -8,6 +8,8 @@ import { Toaster } from "./components/ui/toaster";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import ComplaintDetail from "@/pages/ComplaintDetail";
+import RewardsPage from "@/pages/RewardsPage";
+import NGODrivesPage from "@/pages/NGODrivesPage";
 
 // Admin route guard component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -57,6 +59,8 @@ function App() {
             <ComplaintDetail />
           </AdminRoute>
         } />
+        <Route path="/rewards" element={<RewardsPage />} />
+        <Route path="/ngo-drives" element={<NGODrivesPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />

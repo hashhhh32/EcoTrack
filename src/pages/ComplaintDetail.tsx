@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Clock, ArrowLeft, User, AlertTriangle, Trash } from "lucide-react";
+import { MapPin, Clock, ArrowLeft, User, AlertTriangle, Trash, Trophy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import AdminNavbar from "@/components/admin/AdminNavbar";
@@ -29,6 +29,11 @@ type Complaint = {
   timestamp?: string;
   latitude?: number;
   longitude?: number;
+  status?: "pending" | "resolved" | "rejected";
+  resolved_at?: string;
+  resolved_by?: string;
+  resolution_notes?: string;
+  points_awarded?: number;
 };
 
 const ComplaintDetail = () => {
@@ -223,6 +228,33 @@ const ComplaintDetail = () => {
                       >
                         View on Google Maps
                       </a>
+                    </div>
+                  </div>
+                )}
+
+                {complaint.status === "resolved" && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-md">
+                    <h3 className="font-medium text-green-800 mb-2">Resolution Details</h3>
+                    <div className="space-y-2">
+                      <p className="text-sm text-green-700">
+                        <span className="font-medium">Resolved by:</span> {complaint.resolved_by || "Admin"}
+                      </p>
+                      <p className="text-sm text-green-700">
+                        <span className="font-medium">Resolved on:</span> {complaint.resolved_at ? new Date(complaint.resolved_at).toLocaleString() : "N/A"}
+                      </p>
+                      {complaint.resolution_notes && (
+                        <p className="text-sm text-green-700">
+                          <span className="font-medium">Notes:</span> {complaint.resolution_notes}
+                        </p>
+                      )}
+                      {complaint.points_awarded && (
+                        <div className="mt-3 p-3 bg-green-100 rounded-md flex items-center">
+                          <Trophy className="h-5 w-5 text-amber-500 mr-2" />
+                          <p className="text-sm font-medium text-green-800">
+                            User was awarded {complaint.points_awarded} eco points for this resolved complaint!
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -29,6 +29,25 @@ If you have the Supabase CLI installed, you can run:
 supabase db push -f sql/drive_functions.sql
 ```
 
+## Enabling Real-Time Functionality
+
+To enable real-time updates for NGO drives and participants:
+
+1. Log in to your Supabase dashboard
+2. Navigate to **Database** > **Replication**
+3. In the **Realtime** section, enable the following tables for real-time updates:
+   - `ngo_drives`
+   - `drive_participants`
+4. Select the appropriate publication mode:
+   - For public data (like `ngo_drives`): Choose "Send all changes"
+   - For user-specific data (like `drive_participants`): Choose "Send changes when authenticated"
+5. Click **Save** to apply the changes
+
+This configuration allows the application to receive real-time updates when:
+- New drives are added
+- Existing drives are updated or deleted
+- Users join or leave drives
+
 ## Database Schema
 
 ### ngo_drives

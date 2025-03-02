@@ -8,7 +8,7 @@ import {
   CardFooter 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trophy, Star, Award, Gift, User, LogOut } from "lucide-react";
+import { ArrowLeft, Trophy, Star, Award, Gift, User, LogOut, Mail, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ const RewardsPage = () => {
   const [pointsHistory, setPointsHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState("Eco Beginner");
 
   useEffect(() => {
     if (!user) return;
@@ -48,33 +49,51 @@ const RewardsPage = () => {
           .eq("user_id", user.id)
           .single();
           
-        if (pointsError && pointsError.code !== "PGRST116") { // PGRST116 is "no rows returned" error
-          console.error("Error fetching user points:", pointsError);
-          setError("Failed to load your points data");
+        if (pointsError) {
+          if (pointsError.code === 'PGRST116') {
+            // No points record found
+            setUserPoints(0);
+          } else {
+            console.error("Error fetching user points:", pointsError);
+            setError("Failed to load your points. Please try again.");
+          }
+          setLoading(false);
+          return;
         }
         
-        // Set points (default to 0 if no record found)
-        setUserPoints(pointsData?.total_points || 0);
-        
-        // Fetch points history
-        const { data: historyData, error: historyError } = await supabase
-          .from("points_history")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(10);
+        if (pointsData) {
+          setUserPoints(pointsData.total_points);
           
-        if (historyError) {
-          console.error("Error fetching points history:", historyError);
-          setError("Failed to load your points history");
+          // Set user level based on points
+          if (pointsData.total_points >= 500) {
+            setUserLevel("Eco Master");
+          } else if (pointsData.total_points >= 300) {
+            setUserLevel("Eco Warrior");
+          } else if (pointsData.total_points >= 100) {
+            setUserLevel("Eco Enthusiast");
+          } else {
+            setUserLevel("Eco Beginner");
+          }
+          
+          // Fetch points history
+          const { data: historyData, error: historyError } = await supabase
+            .from("points_history")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(10);
+          
+          if (historyError) {
+            console.error("Error fetching points history:", historyError);
+            setError("Failed to load your points history");
+          }
+          
+          if (historyData) {
+            setPointsHistory(historyData);
+          }
         }
-        
-        if (historyData) {
-          setPointsHistory(historyData);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching rewards data:", err);
-        setError("An unexpected error occurred");
+      } catch (error) {
+        console.error("Error in fetchUserPoints:", error);
       } finally {
         setLoading(false);
       }
@@ -179,7 +198,7 @@ const RewardsPage = () => {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold">Rewards & Achievements</h1>
+            <h1 className="text-xl font-bold">Eco Rewards</h1>
           </div>
           
           <DropdownMenu>
@@ -197,9 +216,54 @@ const RewardsPage = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-72">
+              {user && (
+                <div className="p-4 pb-2">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-12 w-12 border">
+                      <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} />
+                      <AvatarFallback>
+                        {user.email?.substring(0, 2).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <h4 className="font-medium">{user.email?.split('@')[0]}</h4>
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Mail className="h-3 w-3 mr-1" />
+                        {user.email}
+                      </div>
+                      <div className="mt-2 flex items-center">
+                        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                          {userLevel}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="flex items-center">
+                        <Trophy className="h-4 w-4 text-amber-500 mr-1" />
+                        <span className="text-sm font-medium">Eco Points</span>
+                      </div>
+                      <span className="text-sm font-bold text-primary">{userPoints}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full" 
+                        style={{ width: `${Math.min(100, (userPoints / 500) * 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs text-muted-foreground">Beginner</span>
+                      <span className="text-xs text-muted-foreground">Master</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <DropdownMenuLabel>
-                {user ? `Signed in as ${user.email}` : 'My Account'}
+                {user ? `Account Options` : 'My Account'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/")}>
@@ -213,9 +277,12 @@ const RewardsPage = () => {
               <DropdownMenuItem onClick={() => navigate("/waste-classification")}>
                 Waste Classification
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/ngo-drives")}>
+                NGO Drives
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {user ? (
-                <DropdownMenuItem onClick={handleSignOut}>
+                <DropdownMenuItem onClick={signOut}>
                   Sign Out
                 </DropdownMenuItem>
               ) : (

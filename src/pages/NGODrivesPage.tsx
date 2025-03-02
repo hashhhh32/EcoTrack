@@ -8,11 +8,13 @@ import {
   CardFooter 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, User, Clock, ExternalLink, Tent, Users } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, User, Clock, ExternalLink, Tent, Users, Bell, Trophy, Mail, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import { subscribeToNGODrives, subscribeToUserDriveParticipations, unsubscribe } from "@/lib/realtime";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { RealtimeNotificationManager } from "@/components/ui/realtime-notification";
 
 type NGODrive = {
   id: string;
@@ -62,6 +65,15 @@ type DriveParticipant = {
   status: "registered" | "attended" | "cancelled";
 };
 
+// Type for real-time notifications
+type RealtimeNotification = {
+  id: string;
+  message: string;
+  variant?: "default" | "primary" | "success" | "warning" | "destructive";
+  icon?: React.ReactNode;
+  timestamp: number;
+};
+
 const NGODrivesPage = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -72,41 +84,68 @@ const NGODrivesPage = () => {
   const [joinedDrives, setJoinedDrives] = useState<string[]>([]);
   const [joinDialogOpen, setJoinDialogOpen] = useState<string | null>(null);
   const [joiningDrive, setJoiningDrive] = useState(false);
+  const [drivesSubscription, setDrivesSubscription] = useState<RealtimeChannel | null>(null);
+  const [participantsSubscription, setParticipantsSubscription] = useState<RealtimeChannel | null>(null);
+  const [notifications, setNotifications] = useState<RealtimeNotification[]>([]);
+  const [userPoints, setUserPoints] = useState(0);
+  const [userLevel, setUserLevel] = useState("Eco Beginner");
 
-  useEffect(() => {
-    const fetchDrives = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const { data, error } = await supabase
-          .from("ngo_drives")
-          .select("*")
-          .order("date", { ascending: true });
-          
-        if (error) {
-          console.error("Error fetching NGO drives:", error);
-          setError("Failed to load NGO drives");
-          return;
-        }
-        
-        setDrives(data || []);
-      } catch (err) {
-        console.error("Unexpected error fetching NGO drives:", err);
-        setError("An unexpected error occurred");
-      } finally {
-        setLoading(false);
+  // Add a notification
+  const addNotification = (notification: Omit<RealtimeNotification, "id" | "timestamp">) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setNotifications(current => [
+      ...current,
+      {
+        ...notification,
+        id,
+        timestamp: Date.now()
       }
-    };
-    
-    fetchDrives();
-    
-    // If user is logged in, fetch their joined drives
-    if (user) {
-      fetchUserJoinedDrives();
-    }
-  }, [user]);
+    ]);
+  };
 
+  // Remove a notification
+  const removeNotification = (id: string) => {
+    setNotifications(current => current.filter(notification => notification.id !== id));
+  };
+
+  // Clean up old notifications
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setNotifications(current => 
+        current.filter(notification => now - notification.timestamp < 10000)
+      );
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch NGO drives from the database
+  const fetchDrives = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error } = await supabase
+        .from("ngo_drives")
+        .select("*")
+        .order("date", { ascending: true });
+        
+      if (error) {
+        console.error("Error fetching NGO drives:", error);
+        setError("Failed to load NGO drives");
+        return;
+      }
+      
+      setDrives(data || []);
+    } catch (err) {
+      console.error("Unexpected error fetching NGO drives:", err);
+      setError("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // Fetch drives that the current user has joined
   const fetchUserJoinedDrives = async () => {
     if (!user) return;
@@ -130,6 +169,164 @@ const NGODrivesPage = () => {
       console.error("Unexpected error fetching joined drives:", err);
     }
   };
+
+  // Set up real-time subscription for NGO drives
+  const setupDrivesSubscription = () => {
+    // Clean up any existing subscription
+    unsubscribe(drivesSubscription);
+
+    // Create a new subscription
+    const newSubscription = subscribeToNGODrives<NGODrive>((payload) => {
+      console.log('Real-time drive update received:', payload);
+      
+      // Handle different types of changes
+      if (payload.eventType === 'INSERT') {
+        // Add the new drive to the list
+        setDrives(currentDrives => [...currentDrives, payload.new].sort((a, b) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        ));
+        
+        // Show notification for new drive
+        addNotification({
+          message: `New drive added: ${payload.new.title}`,
+          variant: "primary",
+          icon: <Tent className="h-5 w-5" />
+        });
+      } 
+      else if (payload.eventType === 'UPDATE') {
+        // Update the modified drive
+        setDrives(currentDrives => 
+          currentDrives.map(drive => 
+            drive.id === payload.new.id ? payload.new : drive
+          )
+        );
+        
+        // Show notification for updated drive if it's one the user has joined
+        if (joinedDrives.includes(payload.new.id)) {
+          addNotification({
+            message: `Drive updated: ${payload.new.title}`,
+            variant: "warning",
+            icon: <Bell className="h-5 w-5" />
+          });
+        }
+      } 
+      else if (payload.eventType === 'DELETE') {
+        // Remove the deleted drive
+        setDrives(currentDrives => 
+          currentDrives.filter(drive => drive.id !== payload.old.id)
+        );
+        
+        // Show notification for deleted drive if it's one the user has joined
+        if (joinedDrives.includes(payload.old.id)) {
+          addNotification({
+            message: `A drive you joined has been cancelled`,
+            variant: "destructive",
+            icon: <Bell className="h-5 w-5" />
+          });
+        }
+      }
+    });
+
+    setDrivesSubscription(newSubscription);
+  };
+
+  // Set up real-time subscription for drive participants
+  const setupParticipantsSubscription = () => {
+    if (!user) return;
+    
+    // Clean up any existing subscription
+    unsubscribe(participantsSubscription);
+
+    // Create a new subscription
+    const newSubscription = subscribeToUserDriveParticipations<DriveParticipant>(
+      user.id,
+      (payload) => {
+        console.log('Real-time participant update received:', payload);
+        
+        // Handle different types of changes
+        if (payload.eventType === 'INSERT') {
+          // Add the new drive to joined drives
+          setJoinedDrives(current => [...current, payload.new.drive_id]);
+        } 
+        else if (payload.eventType === 'DELETE') {
+          // Remove from joined drives
+          setJoinedDrives(current => 
+            current.filter(driveId => driveId !== payload.old.drive_id)
+          );
+        }
+      }
+    );
+
+    setParticipantsSubscription(newSubscription);
+  };
+
+  useEffect(() => {
+    // Initial fetch
+    fetchDrives();
+    
+    // Set up real-time subscription for drives
+    setupDrivesSubscription();
+    
+    // Clean up subscription when component unmounts
+    return () => {
+      unsubscribe(drivesSubscription);
+      unsubscribe(participantsSubscription);
+    };
+  }, []);
+  
+  useEffect(() => {
+    // If user is logged in, fetch their joined drives and set up participants subscription
+    if (user) {
+      fetchUserJoinedDrives();
+      setupParticipantsSubscription();
+    } else {
+      // Clear joined drives if user logs out
+      setJoinedDrives([]);
+      
+      // Clean up participants subscription
+      unsubscribe(participantsSubscription);
+      setParticipantsSubscription(null);
+    }
+  }, [user]);
+
+  // Fetch user points for profile
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchUserPoints = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user_points")
+          .select("total_points")
+          .eq("user_id", user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching user points:", error);
+          return;
+        }
+        
+        if (data) {
+          setUserPoints(data.total_points);
+          
+          // Set user level based on points
+          if (data.total_points >= 500) {
+            setUserLevel("Eco Master");
+          } else if (data.total_points >= 300) {
+            setUserLevel("Eco Warrior");
+          } else if (data.total_points >= 100) {
+            setUserLevel("Eco Enthusiast");
+          } else {
+            setUserLevel("Eco Beginner");
+          }
+        }
+      } catch (error) {
+        console.error("Error in fetchUserPoints:", error);
+      }
+    };
+    
+    fetchUserPoints();
+  }, [user]);
 
   const handleSignOut = async () => {
     try {
@@ -375,9 +572,54 @@ const NGODrivesPage = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-72">
+              {user && (
+                <div className="p-4 pb-2">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-12 w-12 border">
+                      <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} />
+                      <AvatarFallback>
+                        {user.email?.substring(0, 2).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <h4 className="font-medium">{user.email?.split('@')[0]}</h4>
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Mail className="h-3 w-3 mr-1" />
+                        {user.email}
+                      </div>
+                      <div className="mt-2 flex items-center">
+                        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                          {userLevel}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="flex items-center">
+                        <Trophy className="h-4 w-4 text-amber-500 mr-1" />
+                        <span className="text-sm font-medium">Eco Points</span>
+                      </div>
+                      <span className="text-sm font-bold text-primary">{userPoints}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full" 
+                        style={{ width: `${Math.min(100, (userPoints / 500) * 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs text-muted-foreground">Beginner</span>
+                      <span className="text-xs text-muted-foreground">Master</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <DropdownMenuLabel>
-                {user ? `Signed in as ${user.email}` : 'My Account'}
+                {user ? `Account Options` : 'My Account'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/")}>
@@ -634,6 +876,12 @@ const NGODrivesPage = () => {
           </CardContent>
         </Card>
       </main>
+      
+      {/* Real-time notifications */}
+      <RealtimeNotificationManager 
+        notifications={notifications}
+        onClose={removeNotification}
+      />
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import ComplaintDetail from "@/pages/ComplaintDetail";
 import RewardsPage from "@/pages/RewardsPage";
 import NGODrivesPage from "@/pages/NGODrivesPage";
+import CommunityForumPage from "@/pages/CommunityForumPage";
 
 // Admin route guard component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -61,6 +62,7 @@ function App() {
         } />
         <Route path="/rewards" element={<RewardsPage />} />
         <Route path="/ngo-drives" element={<NGODrivesPage />} />
+        <Route path="/community-forum" element={<CommunityForumPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />

@@ -39,12 +39,77 @@ export type Database = {
         }
         Relationships: []
       }
+      forum_posts: {
+        Row: {
+          id: string
+          user_id: string
+          user_email: string
+          content: string
+          created_at: string
+          likes_count: number
+          replies_count: number
+          parent_id: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          user_email: string
+          content: string
+          created_at?: string
+          likes_count?: number
+          replies_count?: number
+          parent_id?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          user_email?: string
+          content?: string
+          created_at?: string
+          likes_count?: number
+          replies_count?: number
+          parent_id?: string | null
+        }
+        Relationships: []
+      }
+      forum_likes: {
+        Row: {
+          id: string
+          user_id: string
+          post_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          post_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          post_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment: {
+        Args: {
+          x: number
+        }
+        Returns: number
+      }
+      decrement: {
+        Args: {
+          x: number
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

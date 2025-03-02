@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import { subscribeToNGODrives, unsubscribe } from "@/lib/realtime";
 
 type NGODrive = {
   id: string;
@@ -44,6 +46,7 @@ const NGODrivesManagement = () => {
   const [driveToEdit, setDriveToEdit] = useState<NGODrive | null>(null);
   const [driveToDelete, setDriveToDelete] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [subscription, setSubscription] = useState<RealtimeChannel | null>(null);
 
   // Fetch NGO drives from the database
   const fetchDrives = async () => {
@@ -71,8 +74,58 @@ const NGODrivesManagement = () => {
     }
   };
 
+  // Set up real-time subscription
+  const setupRealtimeSubscription = () => {
+    // Clean up any existing subscription
+    unsubscribe(subscription);
+
+    // Create a new subscription
+    const newSubscription = subscribeToNGODrives<NGODrive>((payload) => {
+      console.log('Real-time update received:', payload);
+      
+      // Handle different types of changes
+      if (payload.eventType === 'INSERT') {
+        // Add the new drive to the list
+        setDrives(currentDrives => [...currentDrives, payload.new].sort((a, b) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        ));
+        
+        toast({
+          title: "New drive added",
+          description: `"${payload.new.title}" has been added`,
+          variant: "default",
+        });
+      } 
+      else if (payload.eventType === 'UPDATE') {
+        // Update the modified drive
+        setDrives(currentDrives => 
+          currentDrives.map(drive => 
+            drive.id === payload.new.id ? payload.new : drive
+          )
+        );
+      } 
+      else if (payload.eventType === 'DELETE') {
+        // Remove the deleted drive
+        setDrives(currentDrives => 
+          currentDrives.filter(drive => drive.id !== payload.old.id)
+        );
+      }
+    });
+
+    setSubscription(newSubscription);
+  };
+
   useEffect(() => {
+    // Initial fetch
     fetchDrives();
+    
+    // Set up real-time subscription
+    setupRealtimeSubscription();
+    
+    // Clean up subscription when component unmounts
+    return () => {
+      unsubscribe(subscription);
+    };
   }, []);
 
   // Handle opening the form for editing

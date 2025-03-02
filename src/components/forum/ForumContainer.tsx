@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare } from 'lucide-react';
 
 const ForumContainer: React.FC = () => {
   const [posts, setPosts] = useState<ForumPostType[]>([]);
@@ -22,6 +22,8 @@ const ForumContainer: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const [postReplies, setPostReplies] = useState<Record<string, ForumPostType[]>>({});
+  const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -55,6 +57,25 @@ const ForumContainer: React.FC = () => {
           
           // Count replies
           post.replies_count = replies?.length || 0;
+          
+          // Store replies in state
+          if (replies && replies.length > 0) {
+            setPostReplies(prev => ({
+              ...prev,
+              [post.id]: replies.map(reply => ({
+                ...reply,
+                is_reply: true
+              }))
+            }));
+            
+            // If there are replies, expand the post by default
+            if (replies.length > 0) {
+              setExpandedPosts(prev => ({
+                ...prev,
+                [post.id]: true
+              }));
+            }
+          }
           
           return post;
         })
@@ -106,6 +127,22 @@ const ForumContainer: React.FC = () => {
         const parentPost = posts.find(p => p.id === parentId);
         if (parentPost) {
           parentPost.replies_count = (parentPost.replies_count || 0) + 1;
+          
+          // Add the reply to the replies state
+          setPostReplies(prev => ({
+            ...prev,
+            [parentId]: [...(prev[parentId] || []), {
+              ...data[0],
+              is_reply: true
+            }]
+          }));
+          
+          // Expand the post to show replies
+          setExpandedPosts(prev => ({
+            ...prev,
+            [parentId]: true
+          }));
+          
           setPosts([...posts]);
         }
         setReplyingTo(null);
@@ -118,9 +155,6 @@ const ForumContainer: React.FC = () => {
         title: "Success",
         description: parentId ? "Reply posted successfully!" : "Post created successfully!",
       });
-      
-      // Refresh posts to get the latest data
-      fetchPosts();
     } catch (error) {
       console.error('Error creating post:', error);
       toast({
@@ -167,7 +201,7 @@ const ForumContainer: React.FC = () => {
         // Decrement likes count
         const { error: updateError } = await supabase
           .from('forum_posts')
-          .update({ likes_count: supabase.rpc('decrement', { x: 1 }) })
+          .update({ likes_count: supabase.rpc('decrement', { x: 1 }) as any })
           .eq('id', postId);
 
         if (updateError) throw updateError;
@@ -182,7 +216,7 @@ const ForumContainer: React.FC = () => {
         // Increment likes count
         const { error: updateError } = await supabase
           .from('forum_posts')
-          .update({ likes_count: supabase.rpc('increment', { x: 1 }) })
+          .update({ likes_count: supabase.rpc('increment', { x: 1 }) as any })
           .eq('id', postId);
 
         if (updateError) throw updateError;
@@ -215,6 +249,15 @@ const ForumContainer: React.FC = () => {
       // Remove post from state
       setPosts(posts.filter(post => post.id !== postToDelete));
       
+      // Also remove from replies if it's a reply
+      setPostReplies(prev => {
+        const newReplies = { ...prev };
+        Object.keys(newReplies).forEach(parentId => {
+          newReplies[parentId] = newReplies[parentId].filter(reply => reply.id !== postToDelete);
+        });
+        return newReplies;
+      });
+      
       toast({
         title: "Success",
         description: "Post deleted successfully!",
@@ -244,10 +287,46 @@ const ForumContainer: React.FC = () => {
     });
   };
 
+  const toggleReplies = async (postId: string) => {
+    // Toggle expanded state
+    setExpandedPosts(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+    
+    // If we're expanding and don't have replies yet, fetch them
+    if (!expandedPosts[postId] && (!postReplies[postId] || postReplies[postId].length === 0)) {
+      try {
+        const { data, error } = await supabase
+          .from('forum_posts')
+          .select('*')
+          .eq('parent_id', postId)
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setPostReplies(prev => ({
+            ...prev,
+            [postId]: data.map(reply => ({
+              ...reply,
+              is_reply: true
+            }))
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching replies:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load replies. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto py-6">
-      <h2 className="text-2xl font-bold mb-6">Community Discussion</h2>
-      
       <ForumPostForm onSubmit={handleCreatePost} />
       
       {loading ? (
@@ -284,8 +363,39 @@ const ForumContainer: React.FC = () => {
               
               {/* Display replies if any */}
               {post.replies_count > 0 && (
-                <div className="ml-8 mt-2 space-y-2">
-                  {/* We would fetch and display replies here */}
+                <div className="ml-8 mt-2">
+                  {!expandedPosts[post.id] ? (
+                    <button 
+                      onClick={() => toggleReplies(post.id)}
+                      className="flex items-center text-sm text-muted-foreground hover:text-primary transition-colors p-2"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Show {post.replies_count} {post.replies_count === 1 ? 'reply' : 'replies'}
+                    </button>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => toggleReplies(post.id)}
+                        className="flex items-center text-sm text-muted-foreground hover:text-primary transition-colors p-2"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Hide {post.replies_count} {post.replies_count === 1 ? 'reply' : 'replies'}
+                      </button>
+                      <div className="space-y-2 mt-2">
+                        {postReplies[post.id]?.map(reply => (
+                          <ForumPost
+                            key={reply.id}
+                            post={reply}
+                            onReply={() => {}} // No nested replies
+                            onLike={handleLikePost}
+                            onDelete={confirmDelete}
+                            onReport={handleReportPost}
+                            isReply
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

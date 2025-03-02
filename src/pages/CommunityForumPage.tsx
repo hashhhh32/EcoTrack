@@ -13,7 +13,7 @@ const CommunityForumPage: React.FC = () => {
       
       <Navbar />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pt-20">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8 text-center">
             <h1 className="text-3xl md:text-4xl font-bold text-green-800 mb-4">Community Forum</h1>
@@ -46,6 +46,13 @@ const CommunityForumPage: React.FC = () => {
                 <span>Stay on topic and avoid spam or promotional content.</span>
               </li>
             </ul>
+          </div>
+          
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-green-800 mb-4">Community Discussion</h2>
+            <p className="text-gray-600">
+              Join the conversation below. Share your thoughts, ask questions, and connect with other eco-conscious individuals.
+            </p>
           </div>
           
           <ForumContainer />

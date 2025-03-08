@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from "@/lib/utils";
 
 export type ForumPostType = {
   id: string;
@@ -30,6 +31,7 @@ interface ForumPostProps {
   onDelete?: (postId: string) => void;
   onReport?: (postId: string) => void;
   isReply?: boolean;
+  isLiked?: boolean;
 }
 
 const ForumPost: React.FC<ForumPostProps> = ({
@@ -38,7 +40,8 @@ const ForumPost: React.FC<ForumPostProps> = ({
   onLike,
   onDelete,
   onReport,
-  isReply = false
+  isReply = false,
+  isLiked = false
 }) => {
   const { user, isAdmin } = useAuth();
   const isAuthor = user?.id === post.user_id;
@@ -93,10 +96,13 @@ const ForumPost: React.FC<ForumPostProps> = ({
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-8 text-xs flex items-center gap-1 text-muted-foreground hover:text-primary"
+              className={cn(
+                "h-8 text-xs flex items-center gap-1 text-muted-foreground hover:text-primary",
+                isLiked && "text-red-500 hover:text-red-600"
+              )}
               onClick={() => onLike(post.id)}
             >
-              <Heart className="h-4 w-4" />
+              <Heart className={cn("h-4 w-4", isLiked && "fill-current")} />
               <span>{post.likes_count || 0}</span>
             </Button>
             

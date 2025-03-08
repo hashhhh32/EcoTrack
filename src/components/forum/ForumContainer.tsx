@@ -24,11 +24,13 @@ const ForumContainer: React.FC = () => {
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const [postReplies, setPostReplies] = useState<Record<string, ForumPostType[]>>({});
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     fetchPosts();
+    fetchLikedPosts();
   }, []);
 
   const fetchPosts = async () => {
@@ -91,6 +93,28 @@ const ForumContainer: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLikedPosts = async () => {
+    if (!user) return;
+
+    try {
+      const { data: likes, error } = await supabase
+        .from('forum_likes')
+        .select('post_id')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const likedMap = (likes || []).reduce((acc, like) => {
+        acc[like.post_id] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+
+      setLikedPosts(likedMap);
+    } catch (error) {
+      console.error('Error fetching liked posts:', error);
     }
   };
 
@@ -176,17 +200,24 @@ const ForumContainer: React.FC = () => {
     }
 
     try {
-      // Check if user already liked this post
-      const { data: existingLike, error: likeCheckError } = await supabase
-        .from('forum_likes')
-        .select('*')
-        .eq('post_id', postId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (likeCheckError && likeCheckError.code !== 'PGRST116') {
-        throw likeCheckError;
+      // Find the post in either main posts or replies to get current likes count
+      const post = posts.find(p => p.id === postId) || 
+        Object.values(postReplies).flat().find(r => r.id === postId);
+      
+      if (!post) {
+        throw new Error('Post not found');
       }
+
+      // Check if user already liked this post
+      const { data: likes, error: likeCheckError } = await supabase
+        .from('forum_likes')
+        .select('id')
+        .eq('post_id', postId)
+        .eq('user_id', user.id);
+
+      if (likeCheckError) throw likeCheckError;
+
+      const existingLike = likes && likes.length > 0;
 
       if (existingLike) {
         // User already liked, so remove the like
@@ -198,32 +229,96 @@ const ForumContainer: React.FC = () => {
 
         if (deleteLikeError) throw deleteLikeError;
 
-        // Decrement likes count
+        // Update likes count
+        const newCount = Math.max(0, (post.likes_count || 0) - 1);
         const { error: updateError } = await supabase
           .from('forum_posts')
-          .update({ likes_count: supabase.rpc('decrement', { x: 1 }) as any })
+          .update({ likes_count: newCount })
           .eq('id', postId);
 
         if (updateError) throw updateError;
+
+        // Update local state
+        setPosts(currentPosts => 
+          currentPosts.map(p => 
+            p.id === postId 
+              ? { ...p, likes_count: newCount }
+              : p
+          )
+        );
+
+        // Update replies if the liked post was a reply
+        setPostReplies(currentReplies => {
+          const newReplies = { ...currentReplies };
+          Object.keys(newReplies).forEach(parentId => {
+            newReplies[parentId] = newReplies[parentId].map(reply =>
+              reply.id === postId
+                ? { ...reply, likes_count: newCount }
+                : reply
+            );
+          });
+          return newReplies;
+        });
+
+        // Update liked status
+        setLikedPosts(prev => ({
+          ...prev,
+          [postId]: false
+        }));
+
       } else {
         // User hasn't liked, so add a like
         const { error: insertLikeError } = await supabase
           .from('forum_likes')
-          .insert([{ post_id: postId, user_id: user.id }]);
+          .insert([{ 
+            post_id: postId, 
+            user_id: user.id 
+          }]);
 
         if (insertLikeError) throw insertLikeError;
 
-        // Increment likes count
+        // Update likes count
+        const newCount = (post.likes_count || 0) + 1;
         const { error: updateError } = await supabase
           .from('forum_posts')
-          .update({ likes_count: supabase.rpc('increment', { x: 1 }) as any })
+          .update({ likes_count: newCount })
           .eq('id', postId);
 
         if (updateError) throw updateError;
+
+        // Update local state
+        setPosts(currentPosts => 
+          currentPosts.map(p => 
+            p.id === postId 
+              ? { ...p, likes_count: newCount }
+              : p
+          )
+        );
+
+        // Update replies if the liked post was a reply
+        setPostReplies(currentReplies => {
+          const newReplies = { ...currentReplies };
+          Object.keys(newReplies).forEach(parentId => {
+            newReplies[parentId] = newReplies[parentId].map(reply =>
+              reply.id === postId
+                ? { ...reply, likes_count: newCount }
+                : reply
+            );
+          });
+          return newReplies;
+        });
+
+        // Update liked status
+        setLikedPosts(prev => ({
+          ...prev,
+          [postId]: true
+        }));
       }
 
-      // Refresh posts to get updated like count
-      fetchPosts();
+      toast({
+        title: "Success",
+        description: existingLike ? "Post unliked!" : "Post liked!",
+      });
     } catch (error) {
       console.error('Error liking post:', error);
       toast({
@@ -348,6 +443,7 @@ const ForumContainer: React.FC = () => {
                 onLike={handleLikePost}
                 onDelete={confirmDelete}
                 onReport={handleReportPost}
+                isLiked={likedPosts[post.id] || false}
               />
               
               {replyingTo?.id === post.id && (
@@ -390,6 +486,7 @@ const ForumContainer: React.FC = () => {
                             onLike={handleLikePost}
                             onDelete={confirmDelete}
                             onReport={handleReportPost}
+                            isLiked={likedPosts[reply.id] || false}
                             isReply
                           />
                         ))}

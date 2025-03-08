@@ -117,7 +117,7 @@ We welcome contributions! Please follow these steps:
 
 ## 📞 Support
 
-For support, please email :-[harshu96190@gmail.com]  or open an issue in the GitHub repository.
+For support, please email [harshu96190@gmail.com] or open an issue in the GitHub repository.
 
 ---
 

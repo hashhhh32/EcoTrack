@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Recycle, MapPin, Trophy, AlertTriangle, UserCircle, LogIn, Image, Trash, LogOut, Users, Mail, User, Calendar, Tent, Lightbulb, RotateCcw, Leaf, MessageCircle, MessagesSquare } from "lucide-react";
+import { Recycle, MapPin, Trophy, AlertTriangle, UserCircle, LogIn, Image, Trash, LogOut, Users, Mail, User, Calendar, Tent, Lightbulb, RotateCcw, Leaf, MessageCircle, MessagesSquare, Info, TreePine, Github, Linkedin, Check, Droplet } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import LoginScreen from "@/components/auth/LoginScreen";
@@ -262,6 +262,16 @@ const Index = () => {
                   Admin Dashboard
                 </Button>
               )}
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/impact-and-mission')}
+                className="mr-2 border-white/30 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+              >
+                <Info className="h-4 w-4 mr-2" />
+                About Us
+              </Button>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -787,6 +797,150 @@ const Index = () => {
               )}
             </CardContent>
           </Card>
+        </section>
+
+        <section className="mt-16 mb-10 animate-fade-in animation-delay-400" id="impact-and-mission">
+          <h2 className="text-2xl font-bold mb-6 text-primary flex items-center">
+            <Info className="mr-3 h-6 w-6" />
+            <span className="relative">
+              Our Impact & Mission
+              <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/50 to-transparent"></span>
+            </span>
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Impact Stats */}
+            <Card className="bg-primary/5 border-primary/10 hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <Recycle className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-center mb-2">50,000+</h3>
+                <p className="text-center text-muted-foreground">Tons of Waste Recycled</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-primary/5 border-primary/10 hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-center mb-2">100,000+</h3>
+                <p className="text-center text-muted-foreground">Active Users</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-primary/5 border-primary/10 hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <TreePine className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-center mb-2">25,000+</h3>
+                <p className="text-center text-muted-foreground">Trees Saved</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Community Impact Section */}
+          <div className="mt-8">
+            <h3 className="text-xl font-semibold mb-6 text-primary flex items-center">
+              <Users className="mr-3 h-6 w-6" />
+              Community Impact Stories
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Success Story Card */}
+              <Card className="group hover:shadow-xl transition-all duration-500">
+                <CardContent className="p-0">
+                  <div className="relative h-48 overflow-hidden rounded-t-lg">
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60 z-10" />
+                    <img 
+                      src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+                      alt="Beach Cleanup" 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                    <div className="absolute bottom-4 left-4 right-4 z-20">
+                      <h4 className="text-white font-semibold text-lg mb-1">Mumbai Beach Transformation</h4>
+                      <p className="text-white/90 text-sm">Community-led initiative that transformed Juhu Beach</p>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="bg-emerald-100 rounded-full p-2">
+                        <Trophy className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">5,000+ Volunteers</div>
+                        <div className="text-xs text-muted-foreground">Participated in cleanup drives</div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-sm">Removed 50+ tons of plastic waste</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-sm">Installed smart waste bins</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-sm">Established recycling stations</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Environmental Achievement Card */}
+              <Card className="group hover:shadow-xl transition-all duration-500">
+                <CardContent className="p-0">
+                  <div className="relative h-48 overflow-hidden rounded-t-lg">
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60 z-10" />
+                    <img 
+                      src="https://images.unsplash.com/photo-1550853024-fae8cd4be47f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+                      alt="Urban Garden" 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                    <div className="absolute bottom-4 left-4 right-4 z-20">
+                      <h4 className="text-white font-semibold text-lg mb-1">Green Campus Initiative</h4>
+                      <p className="text-white/90 text-sm">University-wide sustainability program</p>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="bg-blue-100 rounded-full p-2">
+                        <Leaf className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">100% Renewable Energy</div>
+                        <div className="text-xs text-muted-foreground">Achieved in 2023</div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-sm">Zero waste in cafeterias</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-sm">1,000+ trees planted</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-sm">90% reduction in plastic use</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </section>
       </main>
 

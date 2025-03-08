@@ -9,7 +9,8 @@ import {
   AlertTriangle, 
   User,
   Menu,
-  X
+  X,
+  Info
 } from 'lucide-react';
 
 export const Navbar = () => {
@@ -26,6 +27,7 @@ export const Navbar = () => {
     { name: 'Rewards', path: '/rewards', icon: <Award className="w-5 h-5" /> },
     { name: 'Report', path: '/complaint', icon: <AlertTriangle className="w-5 h-5" /> },
     { name: 'Profile', path: '/profile', icon: <User className="w-5 h-5" /> },
+    { name: 'About Us', path: '/impact', icon: <Info className="w-5 h-5" /> },
   ];
 
   return (
@@ -115,8 +117,8 @@ export const Navbar = () => {
       )}
       
       {/* Bottom Navigation for Mobile */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 glass z-50 flex justify-around items-center">
-        {navItems.slice(0, 5).map((item) => (
+      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-background border-t border-primary/10 grid grid-cols-6 gap-1 px-2 py-2 z-50">
+        {navItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}

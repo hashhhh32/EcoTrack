@@ -434,8 +434,8 @@ const NGODrivesPage = () => {
           : drive
       ));
       
-      // Award eco points to the user (50 points for joining a drive)
-      const pointsToAward = 50;
+      // Award eco points to the user (75 points for joining a drive)
+      const pointsToAward = 75;
       
       // Check if user exists in the points table
       const { data: existingPoints } = await supabase
@@ -477,7 +477,7 @@ const NGODrivesPage = () => {
       
       toast({
         title: "Successfully joined!",
-        description: "You have successfully joined this drive and earned 50 eco points!",
+        description: "You have successfully joined this drive and earned 75 eco points!",
       });
       
       setJoinDialogOpen(null);
@@ -518,8 +518,8 @@ const NGODrivesPage = () => {
         console.error("Error updating participant count:", updateError);
       }
 
-      // Deduct eco points from the user (50 points for cancelling)
-      const pointsToDeduct = 50;
+      // Deduct eco points from the user (75 points for cancelling)
+      const pointsToDeduct = 75;
       
       // Get current user points
       const { data: existingPoints, error: pointsError } = await supabase
@@ -859,7 +859,7 @@ const NGODrivesPage = () => {
                             <div className="mt-4 p-3 bg-blue-50 text-blue-800 rounded-md text-sm">
                               <p className="font-medium">By joining this drive:</p>
                               <ul className="list-disc list-inside mt-1 space-y-1">
-                                <li>You'll earn 50 eco points</li>
+                                <li>You'll earn 75 eco points</li>
                                 <li>You'll receive updates about the drive</li>
                                 <li>You commit to participate on the scheduled date</li>
                               </ul>

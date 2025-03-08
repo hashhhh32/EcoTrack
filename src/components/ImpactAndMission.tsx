@@ -1,9 +1,10 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Leaf, Globe2, Users, Recycle, Award, TreePine, Scale, Heart, ChevronDown, ChevronUp, Github, Linkedin, Mail } from "lucide-react";
+import { Leaf, Globe2, Users, Recycle, Award, TreePine, Scale, Heart, ChevronDown, ChevronUp, Github, Linkedin, Mail, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const teamMembers = [
   {
@@ -41,9 +42,24 @@ const teamMembers = [
 ];
 
 const ImpactAndMission = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background to-background/80">
       <div className="max-w-7xl mx-auto">
+        {/* Back Button */}
+        <div className="mb-12">
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 bg-background/95 border border-border/40 shadow-sm hover:shadow-md transition-all duration-200 hover:bg-primary/5 hover:border-primary/30"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-medium">Back to Previous Page</span>
+          </Button>
+        </div>
+
         {/* Mission Statement */}
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold tracking-tight text-primary mb-4">

@@ -13,6 +13,7 @@ import NGODrivesPage from "@/pages/NGODrivesPage";
 import CommunityForumPage from "@/pages/CommunityForumPage";
 import ProfilePage from "@/pages/ProfilePage";
 import ImpactPage from "@/pages/ImpactPage";
+import ImpactAndMission from "@/components/ImpactAndMission";
 
 // Admin route guard component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -48,6 +49,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/impact" element={<ImpactPage />} />
+        <Route path="/impact-and-mission" element={<ImpactAndMission />} />
         <Route path="/waste-classification" element={<WasteClassification />} />
         <Route path="/complaint" element={<ComplaintPage />} />
         <Route path="/rewards" element={<RewardsPage />} />

@@ -485,7 +485,7 @@ const RewardsPage = () => {
                 </div>
                 <div>
                   <span className="font-medium">Classify Waste</span>
-                  <p className="text-sm text-muted-foreground">Use our waste classification tool to identify recyclables (+25 points)</p>
+                  <p className="text-sm text-muted-foreground">Use our waste classification tool to identify recyclables (+5 points)</p>
                 </div>
               </li>
               <li className="flex items-start">

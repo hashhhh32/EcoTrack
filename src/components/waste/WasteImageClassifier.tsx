@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { IMAGENET_CLASSES } from "@/lib/imageNetClasses";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 // Map ImageNet classes to waste categories
 const wasteCategories = {
@@ -40,6 +42,7 @@ const wasteCategories = {
 };
 
 export const WasteImageClassifier = () => {
+  const { user } = useAuth();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -140,6 +143,76 @@ export const WasteImageClassifier = () => {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const updateUserPoints = async () => {
+    if (!user) return;
+
+    try {
+      const POINTS_FOR_CLASSIFICATION = 5;
+
+      // First, try to update existing points
+      const { data: existingPoints, error: fetchError } = await supabase
+        .from('user_points')
+        .select('total_points')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching points:', fetchError);
+        return;
+      }
+
+      if (existingPoints) {
+        // Update existing points
+        const { error: updateError } = await supabase
+          .from('user_points')
+          .update({ total_points: existingPoints.total_points + POINTS_FOR_CLASSIFICATION })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('Error updating points:', updateError);
+          return;
+        }
+      } else {
+        // Create new points record
+        const { error: insertError } = await supabase
+          .from('user_points')
+          .insert([
+            { user_id: user.id, total_points: POINTS_FOR_CLASSIFICATION }
+          ]);
+
+        if (insertError) {
+          console.error('Error inserting points:', insertError);
+          return;
+        }
+      }
+
+      // Add to points history
+      const { error: historyError } = await supabase
+        .from('points_history')
+        .insert([
+          {
+            user_id: user.id,
+            points: POINTS_FOR_CLASSIFICATION,
+            action: 'Waste Classification',
+            description: 'Successfully classified waste through image upload'
+          }
+        ]);
+
+      if (historyError) {
+        console.error('Error updating points history:', historyError);
+        return;
+      }
+
+      toast({
+        title: "Points Earned!",
+        description: `You earned ${POINTS_FOR_CLASSIFICATION} points for classifying waste!`,
+      });
+
+    } catch (error) {
+      console.error('Error in updateUserPoints:', error);
+    }
   };
 
   const classifyImage = async () => {
@@ -343,6 +416,11 @@ export const WasteImageClassifier = () => {
           title: `Classified as ${highestCategory}`,
           description: `Item detected: ${predictions[0].className}`,
         });
+
+        // After successful classification, update points
+        if (highestCategory && user) {
+          await updateUserPoints();
+        }
       } catch (modelError) {
         console.error("Model prediction error:", modelError);
         

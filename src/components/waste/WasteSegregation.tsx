@@ -1,11 +1,15 @@
-
 import React, { useState } from 'react';
 import { Search, ArrowRight, Info } from 'lucide-react';
 import AnimatedTransition from '../ui/AnimatedTransition';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 const WasteSegregation = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
   
   const wasteCategories = [
     {
@@ -101,8 +105,82 @@ const WasteSegregation = () => {
     )
   );
   
-  const handleCategoryClick = (categoryId: string) => {
+  const handleCategoryClick = async (categoryId: string) => {
     setSelectedCategory(categoryId === selectedCategory ? null : categoryId);
+    
+    // Award points only when selecting a new category (not when deselecting)
+    if (categoryId !== selectedCategory && user) {
+      try {
+        // First, try to update existing points
+        const { data: existingPoints, error: fetchError } = await supabase
+          .from('user_points')
+          .select('total_points')
+          .eq('user_id', user.id)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Error fetching points:', fetchError);
+          return;
+        }
+
+        const POINTS_PER_SEGREGATION = 5;
+        
+        if (existingPoints) {
+          // Update existing points
+          const { error: updateError } = await supabase
+            .from('user_points')
+            .update({ total_points: existingPoints.total_points + POINTS_PER_SEGREGATION })
+            .eq('user_id', user.id);
+
+          if (updateError) {
+            console.error('Error updating points:', updateError);
+            return;
+          }
+        } else {
+          // Create new points record
+          const { error: insertError } = await supabase
+            .from('user_points')
+            .insert([
+              { user_id: user.id, total_points: POINTS_PER_SEGREGATION }
+            ]);
+
+          if (insertError) {
+            console.error('Error inserting points:', insertError);
+            return;
+          }
+        }
+
+        // Add to points history
+        const { error: historyError } = await supabase
+          .from('points_history')
+          .insert([
+            {
+              user_id: user.id,
+              points: POINTS_PER_SEGREGATION,
+              action: 'Waste Segregation',
+              description: `Segregated ${wasteCategories.find(c => c.id === categoryId)?.name.toLowerCase()} waste`
+            }
+          ]);
+
+        if (historyError) {
+          console.error('Error updating points history:', historyError);
+          return;
+        }
+
+        toast({
+          title: "Points Earned!",
+          description: `You earned ${POINTS_PER_SEGREGATION} points for waste segregation!`,
+        });
+
+      } catch (error) {
+        console.error('Error in handleCategoryClick:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update points. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
   };
   
   return (

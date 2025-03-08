@@ -11,6 +11,8 @@ import ComplaintDetail from "@/pages/ComplaintDetail";
 import RewardsPage from "@/pages/RewardsPage";
 import NGODrivesPage from "@/pages/NGODrivesPage";
 import CommunityForumPage from "@/pages/CommunityForumPage";
+import ProfilePage from "@/pages/ProfilePage";
+import ImpactPage from "@/pages/ImpactPage";
 
 // Admin route guard component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -45,8 +47,13 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/impact" element={<ImpactPage />} />
         <Route path="/waste-classification" element={<WasteClassification />} />
         <Route path="/complaint" element={<ComplaintPage />} />
+        <Route path="/rewards" element={<RewardsPage />} />
+        <Route path="/ngo-drives" element={<NGODrivesPage />} />
+        <Route path="/community-forum" element={<CommunityForumPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route 
           path="/admin" 
           element={
@@ -60,9 +67,6 @@ function App() {
             <ComplaintDetail />
           </AdminRoute>
         } />
-        <Route path="/rewards" element={<RewardsPage />} />
-        <Route path="/ngo-drives" element={<NGODrivesPage />} />
-        <Route path="/community-forum" element={<CommunityForumPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />

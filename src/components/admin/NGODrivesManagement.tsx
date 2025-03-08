@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, MapPin, Trash, Edit, Plus, Users, RefreshCw, Tent } from "lucide-react";
+import { Calendar, MapPin, Trash, Edit, Plus, Users, RefreshCw, Tent, UserCircle2 } from "lucide-react";
 import { NGODriveForm } from "./NGODriveForm";
 import {
   AlertDialog,
@@ -20,6 +20,15 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { subscribeToNGODrives, unsubscribe } from "@/lib/realtime";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type NGODrive = {
   id: string;
@@ -37,6 +46,19 @@ type NGODrive = {
   participants_count: number;
 };
 
+type DriveParticipant = {
+  id: string;
+  drive_id: string;
+  user_id: string;
+  user_email: string;
+  joined_at: string;
+  status: "registered" | "attended" | "cancelled";
+  user_profile?: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+};
+
 const NGODrivesManagement = () => {
   const { toast } = useToast();
   const [drives, setDrives] = useState<NGODrive[]>([]);
@@ -47,25 +69,51 @@ const NGODrivesManagement = () => {
   const [driveToDelete, setDriveToDelete] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [subscription, setSubscription] = useState<RealtimeChannel | null>(null);
+  const [selectedDriveParticipants, setSelectedDriveParticipants] = useState<DriveParticipant[]>([]);
+  const [participantsDialogOpen, setParticipantsDialogOpen] = useState(false);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [participantsSubscription, setParticipantsSubscription] = useState<RealtimeChannel | null>(null);
 
-  // Fetch NGO drives from the database
+  // Fetch NGO drives from the database with participant counts
   const fetchDrives = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const { data, error } = await supabase
+      // First get all drives
+      const { data: drivesData, error: drivesError } = await supabase
         .from("ngo_drives")
         .select("*")
         .order("date", { ascending: true });
         
-      if (error) {
-        console.error("Error fetching NGO drives:", error);
+      if (drivesError) {
+        console.error("Error fetching NGO drives:", drivesError);
         setError("Failed to load NGO drives");
         return;
       }
+
+      if (!drivesData) {
+        setDrives([]);
+        return;
+      }
+
+      // Then get participant counts for each drive
+      const { data: participantCounts, error: countsError } = await supabase
+        .rpc('get_drive_participant_counts');
+
+      if (countsError) {
+        console.error("Error fetching participant counts:", countsError);
+      }
+
+      // Combine the data
+      const drivesWithCounts = drivesData.map(drive => ({
+        ...drive,
+        participants_count: (participantCounts as Array<{drive_id: string, count: number}>)?.find(
+          p => p.drive_id === drive.id
+        )?.count || 0
+      }));
       
-      setDrives(data || []);
+      setDrives(drivesWithCounts);
     } catch (err) {
       console.error("Unexpected error fetching NGO drives:", err);
       setError("An unexpected error occurred");
@@ -74,30 +122,19 @@ const NGODrivesManagement = () => {
     }
   };
 
-  // Set up real-time subscription
-  const setupRealtimeSubscription = () => {
+  // Set up real-time subscription for drives
+  const setupDrivesSubscription = () => {
     // Clean up any existing subscription
     unsubscribe(subscription);
 
     // Create a new subscription
     const newSubscription = subscribeToNGODrives<NGODrive>((payload) => {
-      console.log('Real-time update received:', payload);
+      console.log('Real-time drive update received:', payload);
       
-      // Handle different types of changes
       if (payload.eventType === 'INSERT') {
-        // Add the new drive to the list
-        setDrives(currentDrives => [...currentDrives, payload.new].sort((a, b) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        ));
-        
-        toast({
-          title: "New drive added",
-          description: `"${payload.new.title}" has been added`,
-          variant: "default",
-        });
+        setDrives(currentDrives => [...currentDrives, { ...payload.new, participants_count: 0 }]);
       } 
       else if (payload.eventType === 'UPDATE') {
-        // Update the modified drive
         setDrives(currentDrives => 
           currentDrives.map(drive => 
             drive.id === payload.new.id ? payload.new : drive
@@ -105,7 +142,6 @@ const NGODrivesManagement = () => {
         );
       } 
       else if (payload.eventType === 'DELETE') {
-        // Remove the deleted drive
         setDrives(currentDrives => 
           currentDrives.filter(drive => drive.id !== payload.old.id)
         );
@@ -115,16 +151,48 @@ const NGODrivesManagement = () => {
     setSubscription(newSubscription);
   };
 
+  // Set up real-time subscription for participants
+  const setupParticipantsSubscription = () => {
+    // Clean up any existing subscription
+    unsubscribe(participantsSubscription);
+
+    // Create a new subscription for drive_participants table
+    const newSubscription = supabase
+      .channel('drive-participants-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'drive_participants'
+        },
+        async (payload: any) => {
+          console.log('Participant change received:', payload);
+
+          // Refresh the drives to get updated participant counts
+          await fetchDrives();
+
+          // If we're currently viewing participants for this drive, refresh them
+          if (participantsDialogOpen && payload.new && 'drive_id' in payload.new) {
+            await fetchDriveParticipants(payload.new.drive_id);
+          }
+        }
+      )
+      .subscribe();
+
+    setParticipantsSubscription(newSubscription);
+  };
+
+  // Set up subscriptions when component mounts
   useEffect(() => {
-    // Initial fetch
     fetchDrives();
+    setupDrivesSubscription();
+    setupParticipantsSubscription();
     
-    // Set up real-time subscription
-    setupRealtimeSubscription();
-    
-    // Clean up subscription when component unmounts
+    // Clean up subscriptions when component unmounts
     return () => {
       unsubscribe(subscription);
+      unsubscribe(participantsSubscription);
     };
   }, []);
 
@@ -192,6 +260,62 @@ const NGODrivesManagement = () => {
     if (activeTab === "all") return true;
     return drive.status === activeTab;
   });
+
+  // Fetch participants for a specific drive
+  const fetchDriveParticipants = async (driveId: string) => {
+    try {
+      setLoadingParticipants(true);
+      
+      // First, get the drive participants
+      const { data: participants, error: participantsError } = await supabase
+        .from("drive_participants")
+        .select("*")
+        .eq("drive_id", driveId)
+        .order("joined_at", { ascending: false });
+        
+      if (participantsError) throw participantsError;
+      
+      if (!participants) {
+        setSelectedDriveParticipants([]);
+        return;
+      }
+
+      // Then, get the user profiles for these participants
+      const userIds = participants.map(p => p.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+        
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const participantsWithProfiles = participants.map(participant => ({
+        ...participant,
+        user_profile: profiles?.find(profile => profile.id === participant.user_id) || {
+          full_name: null,
+          avatar_url: null
+        }
+      }));
+      
+      setSelectedDriveParticipants(participantsWithProfiles);
+    } catch (error) {
+      console.error("Error fetching drive participants:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load drive participants",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
+
+  // Handle viewing participants
+  const handleViewParticipants = async (driveId: string) => {
+    setParticipantsDialogOpen(true);
+    await fetchDriveParticipants(driveId);
+  };
 
   return (
     <div className="space-y-4">
@@ -313,15 +437,27 @@ const NGODrivesManagement = () => {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-between">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleEdit(drive)}
-                  className="flex items-center"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleEdit(drive)}
+                    className="flex items-center"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewParticipants(drive.id)}
+                    className="flex items-center"
+                  >
+                    <UserCircle2 className="h-4 w-4 mr-1" />
+                    Participants
+                  </Button>
+                </div>
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -367,6 +503,69 @@ const NGODrivesManagement = () => {
         driveToEdit={driveToEdit}
         onSuccess={fetchDrives}
       />
+      
+      {/* Participants Dialog */}
+      <Dialog open={participantsDialogOpen} onOpenChange={setParticipantsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Drive Participants</DialogTitle>
+            <DialogDescription>
+              View all users who have registered for this drive
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {loadingParticipants ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              </div>
+            ) : selectedDriveParticipants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No participants have registered yet
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-4">
+                  {selectedDriveParticipants.map((participant) => (
+                    <div key={participant.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage 
+                            src={participant.user_profile?.avatar_url || `https://avatar.vercel.sh/${participant.user_email}`}
+                          />
+                          <AvatarFallback>
+                            {participant.user_email.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">
+                            {participant.user_profile?.full_name || 'Anonymous User'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {participant.user_email}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Joined {format(new Date(participant.joined_at), 'MMM d, yyyy h:mm a')}
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        participant.status === 'attended' 
+                          ? 'bg-green-100 text-green-800'
+                          : participant.status === 'cancelled'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {participant.status.charAt(0).toUpperCase() + participant.status.slice(1)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

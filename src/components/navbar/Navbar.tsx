@@ -23,10 +23,8 @@ export const Navbar = () => {
   const navItems = [
     { name: 'Home', path: '/', icon: <Home className="w-5 h-5" /> },
     { name: 'Segregation', path: '/waste-classification', icon: <Recycle className="w-5 h-5" /> },
-    { name: 'Collection', path: '/collection', icon: <Truck className="w-5 h-5" /> },
-    { name: 'Location', path: '/location', icon: <MapPin className="w-5 h-5" /> },
     { name: 'Rewards', path: '/rewards', icon: <Award className="w-5 h-5" /> },
-    { name: 'Report', path: '/report', icon: <AlertTriangle className="w-5 h-5" /> },
+    { name: 'Report', path: '/complaint', icon: <AlertTriangle className="w-5 h-5" /> },
     { name: 'Profile', path: '/profile', icon: <User className="w-5 h-5" /> },
   ];
 

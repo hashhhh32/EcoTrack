@@ -340,6 +340,9 @@ const Index = () => {
                   <DropdownMenuItem onClick={() => navigate("/complaint")} className="hover:bg-primary/5 cursor-pointer">
                     <AlertTriangle className="h-4 w-4 mr-2 text-primary/70" /> Report Waste
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/profile")} className="hover:bg-primary/5 cursor-pointer">
+                    <User className="h-4 w-4 mr-2 text-primary/70" /> Profile Settings
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="hover:bg-red-50 text-red-600 cursor-pointer">
                     <LogOut className="h-4 w-4 mr-2" /> Sign Out

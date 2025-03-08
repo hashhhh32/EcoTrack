@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Trash, AlertTriangle, Settings, BarChart, MapPin, MessageSquare, Clock, RefreshCw, CheckCircle2, Calendar, Tent } from "lucide-react";
+import { Users, Trash, AlertTriangle, Settings, BarChart, MapPin, MessageSquare, Clock, RefreshCw, CheckCircle2, Calendar, Tent, Trophy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import AdminNavbar from "@/components/admin/AdminNavbar";
 import UserManagement from "@/components/admin/UserManagement";
@@ -25,6 +25,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import NGODrivesManagement from "@/components/admin/NGODrivesManagement";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Complaint = {
   id: string;
@@ -78,6 +86,26 @@ const createSampleComplaints = (): Complaint[] => {
   ];
 };
 
+// Update UserProfile type
+type UserProfile = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  phone_number: string | null;
+  address: string | null;
+  bio: string | null;
+  date_of_birth: string | null;
+  updated_at: string;
+  email?: string;
+  total_points?: number;
+  role?: string;
+};
+
+type AuthUser = {
+  id: string;
+  email?: string;
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
@@ -90,6 +118,8 @@ const AdminDashboard = () => {
   const [resolveDialogOpen, setResolveDialogOpen] = useState<string | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState<string>("");
   const { toast } = useToast();
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   useEffect(() => {
     // Redirect if not admin
@@ -358,6 +388,78 @@ const AdminDashboard = () => {
     const date = new Date(timestamp);
     return date.toLocaleString();
   };
+
+  // Add fetchUsers function
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      
+      // First check if the current user is an admin
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (roleError) {
+        throw new Error('Failed to verify admin status');
+      }
+
+      if (!roleData || roleData.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      // Fetch user profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('*');
+
+      if (profilesError) throw profilesError;
+
+      // Fetch user points
+      const { data: points, error: pointsError } = await supabase
+        .from('user_points')
+        .select('user_id, total_points');
+
+      if (pointsError) throw pointsError;
+
+      // Fetch user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) throw rolesError;
+
+      // Combine the data
+      const combinedUsers = (profiles || []).map(profile => ({
+        ...profile,
+        total_points: points?.find(p => p.user_id === profile.id)?.total_points || 0,
+        role: roles?.find(r => r.user_id === profile.id)?.role || 'user'
+      }));
+
+      setUsers(combinedUsers);
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch user details',
+        variant: 'destructive'
+      });
+      
+      // If unauthorized, redirect to home
+      if (error.message?.includes('Unauthorized')) {
+        navigate('/');
+      }
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers();
+    }
+  }, [isAdmin]);
 
   if (!isAdmin) {
     return null; // Will redirect in useEffect
@@ -849,7 +951,105 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
-            <UserManagement />
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-2xl">User Management</CardTitle>
+                    <CardDescription>View and manage user details</CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={fetchUsers}
+                    disabled={usersLoading}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${usersLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {usersLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No users found
+                  </div>
+                ) : (
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Points</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Last Updated</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={user.avatar_url || `https://avatar.vercel.sh/${user.email}`} />
+                                  <AvatarFallback>
+                                    {user.email?.substring(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{user.full_name || 'N/A'}</div>
+                                  <div className="text-sm text-muted-foreground">{user.email}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{user.phone_number || 'N/A'}</div>
+                                <div className="text-muted-foreground">
+                                  {user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString() : 'N/A'}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {user.address || 'N/A'}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Trophy className="h-4 w-4 text-amber-500" />
+                                <span>{user.total_points || 0}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                user.role === 'admin' 
+                                  ? 'bg-primary/10 text-primary' 
+                                  : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {user.role}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-muted-foreground">
+                                {user.updated_at ? new Date(user.updated_at).toLocaleString() : 'N/A'}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">

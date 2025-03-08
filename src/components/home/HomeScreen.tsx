@@ -36,6 +36,14 @@ const HomeScreen = () => {
   
   const featureCards = [
     {
+      title: 'Our Impact & Mission',
+      description: 'Learn how we\'re making a difference in waste management',
+      icon: <Leaf className="w-6 h-6 text-eco-leaf" />,
+      path: '/impact',
+      color: 'bg-eco-leafDark/20',
+      iconBg: 'bg-eco-leafDark/10'
+    },
+    {
       title: 'Waste Segregation',
       description: 'Learn how to properly sort different types of waste',
       icon: <Recycle className="w-6 h-6 text-eco-leaf" />,

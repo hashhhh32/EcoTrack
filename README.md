@@ -100,10 +100,6 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch
 5. Open a Pull Request
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 👥 Admin Features
 
 - Dashboard for monitoring user activities
@@ -121,8 +117,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, please email [your-email@example.com](mailto:your-email@example.com) or open an issue in the GitHub repository.
+For support, please email :-[harshu96190@gmail.com]  or open an issue in the GitHub repository.
 
 ---
 
-Built with 💚 for a sustainable future
+EcoTrack - Making waste management sustainable

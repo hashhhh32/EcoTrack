@@ -38,6 +38,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { RealtimeNotificationManager } from "@/components/ui/realtime-notification";
+import { generateAvatarUrl } from "@/lib/utils";
 
 type NGODrive = {
   id: string;
@@ -89,6 +90,8 @@ const NGODrivesPage = () => {
   const [notifications, setNotifications] = useState<RealtimeNotification[]>([]);
   const [userPoints, setUserPoints] = useState(0);
   const [userLevel, setUserLevel] = useState("Eco Beginner");
+  const [selectedDrive, setSelectedDrive] = useState<NGODrive | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   // Add a notification
   const addNotification = (notification: Omit<RealtimeNotification, "id" | "timestamp">) => {
@@ -514,6 +517,55 @@ const NGODrivesPage = () => {
       if (updateError) {
         console.error("Error updating participant count:", updateError);
       }
+
+      // Deduct eco points from the user (50 points for cancelling)
+      const pointsToDeduct = 50;
+      
+      // Get current user points
+      const { data: existingPoints, error: pointsError } = await supabase
+        .from("user_points")
+        .select("total_points")
+        .eq("user_id", user.id)
+        .single();
+        
+      if (pointsError) {
+        console.error("Error fetching user points:", pointsError);
+      } else if (existingPoints) {
+        // Update user points
+        const newPoints = Math.max(0, existingPoints.total_points - pointsToDeduct);
+        await supabase
+          .from("user_points")
+          .update({
+            total_points: newPoints,
+            last_updated: new Date().toISOString()
+          })
+          .eq("user_id", user.id);
+
+        // Update local state for points display
+        setUserPoints(newPoints);
+        
+        // Update user level based on new points
+        if (newPoints >= 500) {
+          setUserLevel("Eco Master");
+        } else if (newPoints >= 300) {
+          setUserLevel("Eco Warrior");
+        } else if (newPoints >= 100) {
+          setUserLevel("Eco Enthusiast");
+        } else {
+          setUserLevel("Eco Beginner");
+        }
+      }
+      
+      // Add points history record for the deduction
+      await supabase
+        .from("points_history")
+        .insert({
+          user_id: user.id,
+          points: -pointsToDeduct,
+          action: "Cancelled NGO Drive Participation",
+          description: `Cancelled participation in ${drives.find(d => d.id === driveId)?.title || "environmental drive"}`,
+          created_at: new Date().toISOString()
+        });
       
       // Remove from local state
       setJoinedDrives(joinedDrives.filter(id => id !== driveId));
@@ -527,7 +579,7 @@ const NGODrivesPage = () => {
       
       toast({
         title: "Participation cancelled",
-        description: "You have cancelled your participation in this drive",
+        description: `You have cancelled your participation in this drive. ${pointsToDeduct} eco points have been deducted.`,
       });
     } catch (error: any) {
       console.error("Error cancelling drive participation:", error);
@@ -539,6 +591,12 @@ const NGODrivesPage = () => {
     } finally {
       setJoiningDrive(false);
     }
+  };
+
+  // Handle viewing drive details
+  const handleViewDetails = (drive: NGODrive) => {
+    setSelectedDrive(drive);
+    setDetailsDialogOpen(true);
   };
 
   return (
@@ -562,7 +620,7 @@ const NGODrivesPage = () => {
               <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/20">
                 {user ? (
                   <Avatar className="h-8 w-8 border border-white/30">
-                    <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} />
+                    <AvatarImage src={generateAvatarUrl(user.email)} />
                     <AvatarFallback className="text-xs">
                       {user.email?.substring(0, 2).toUpperCase() || "U"}
                     </AvatarFallback>
@@ -577,7 +635,7 @@ const NGODrivesPage = () => {
                 <div className="p-4 pb-2">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-12 w-12 border">
-                      <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} />
+                      <AvatarImage src={generateAvatarUrl(user.email)} />
                       <AvatarFallback>
                         {user.email?.substring(0, 2).toUpperCase() || "U"}
                       </AvatarFallback>
@@ -750,7 +808,11 @@ const NGODrivesPage = () => {
                 </CardContent>
                 <CardFooter className="pt-0">
                   {drive.status === "completed" ? (
-                    <Button className="w-full" variant="outline">
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => handleViewDetails(drive)}
+                    >
                       View Details
                       <ChevronRightIcon className="h-4 w-4 ml-2" />
                     </Button>
@@ -882,6 +944,110 @@ const NGODrivesPage = () => {
         notifications={notifications}
         onClose={removeNotification}
       />
+
+      {/* Drive Details Dialog */}
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          {selectedDrive && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{selectedDrive.title}</DialogTitle>
+                <DialogDescription className="text-base">
+                  Organized by {selectedDrive.organizer}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-4">
+                <div className="relative h-48 rounded-lg overflow-hidden mb-6">
+                  {selectedDrive.image_url ? (
+                    <img 
+                      src={selectedDrive.image_url} 
+                      alt={selectedDrive.title} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                      <Tent className="h-16 w-16 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <span className={`text-sm font-medium px-3 py-1 rounded-full ${getStatusColor(selectedDrive.status)}`}>
+                      {selectedDrive.status.charAt(0).toUpperCase() + selectedDrive.status.slice(1)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-medium mb-2">About the Drive</h3>
+                    <p className="text-muted-foreground">{selectedDrive.description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center text-sm">
+                        <Calendar className="h-4 w-4 mr-2 text-primary" />
+                        <div>
+                          <p className="font-medium">Date & Time</p>
+                          <p className="text-muted-foreground">
+                            {format(new Date(selectedDrive.date), 'MMMM d, yyyy')}
+                            <br />
+                            {selectedDrive.time}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center text-sm">
+                        <MapPin className="h-4 w-4 mr-2 text-primary" />
+                        <div>
+                          <p className="font-medium">Location</p>
+                          <p className="text-muted-foreground">{selectedDrive.location}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center text-sm">
+                        <Mail className="h-4 w-4 mr-2 text-primary" />
+                        <div>
+                          <p className="font-medium">Contact Email</p>
+                          <p className="text-muted-foreground">{selectedDrive.contact_email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center text-sm">
+                        <Phone className="h-4 w-4 mr-2 text-primary" />
+                        <div>
+                          <p className="font-medium">Contact Phone</p>
+                          <p className="text-muted-foreground">{selectedDrive.contact_phone}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center text-sm">
+                    <Users className="h-4 w-4 mr-2 text-primary" />
+                    <div>
+                      <p className="font-medium">Participation</p>
+                      <p className="text-muted-foreground">
+                        {selectedDrive.participants_count} participants joined this drive
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-muted rounded-lg">
+                    <h4 className="font-medium mb-2">Drive Completion Summary</h4>
+                    <p className="text-sm text-muted-foreground">
+                      This drive was successfully completed on {format(new Date(selectedDrive.date), 'MMMM d, yyyy')}. 
+                      Thank you to all participants who contributed to making this environmental initiative a success.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

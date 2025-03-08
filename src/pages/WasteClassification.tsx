@@ -100,7 +100,9 @@ const WasteClassification = () => {
       </header>
       
       <main className="flex-1">
-        <WasteImageClassifier />
+        <div className="container mx-auto py-8 px-4">
+          <WasteImageClassifier />
+        </div>
       </main>
     </div>
   );

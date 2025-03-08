@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Camera, Upload, Image as ImageIcon, Loader, AlertTriangle, 
-  CheckCircle2, Brain, Info, ArrowRight, Trash2
+  Upload, Image as ImageIcon, Loader, AlertTriangle, 
+  CheckCircle2, Brain, Info, Trash2, Camera
 } from "lucide-react";
 import { IMAGENET_CLASSES } from "@/lib/imageNetClasses";
 import { toast } from "@/hooks/use-toast";
@@ -51,6 +51,10 @@ export const WasteImageClassifier = () => {
   const [wasteCategory, setWasteCategory] = useState<string | null>(null);
   const [modelTraining, setModelTraining] = useState(false);
   const [trainingProgress, setTrainingProgress] = useState(0);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [imageHash, setImageHash] = useState<string | null>(null);
 
   useEffect(() => {
     loadModel();
@@ -95,7 +99,6 @@ export const WasteImageClassifier = () => {
     
     try {
       // Simulate training progress for demo purposes
-      // In a real app, you would create and train a custom model on top of MobileNet
       const totalSteps = 20;
       
       for (let step = 0; step < totalSteps; step++) {
@@ -104,11 +107,6 @@ export const WasteImageClassifier = () => {
         setTrainingProgress(progress);
         console.log(`Training step ${step + 1}/${totalSteps}`);
       }
-      
-      // In a real implementation, we would:
-      // 1. Extract features using MobileNet
-      // 2. Train a classifier on top of these features
-      // 3. Save the trained classifier
       
       setModelTraining(false);
       setTrainingProgress(1);
@@ -129,14 +127,39 @@ export const WasteImageClassifier = () => {
     }
   };
 
+  const calculateImageHash = async (imageData: string): Promise<string> => {
+    try {
+      // Remove the data URL prefix to only hash the actual image data
+      const base64Data = imageData.split(',')[1];
+      // Convert base64 to array buffer
+      const binaryString = atob(base64Data);
+      const byteArray = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        byteArray[i] = binaryString.charCodeAt(i);
+      }
+      // Use Web Crypto API to create SHA-256 hash
+      const hashBuffer = await crypto.subtle.digest('SHA-256', byteArray);
+      // Convert hash to hex string
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    } catch (error) {
+      console.error('Error generating image hash:', error);
+      throw error;
+    }
+  };
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       if (e.target?.result) {
-        setSelectedImage(e.target.result as string);
+        const imageData = e.target.result as string;
+        const hash = await calculateImageHash(imageData);
+        setImageHash(hash);
+        setSelectedImage(imageData);
         setPrediction(null);
         setWasteCategory(null);
         setError(null);
@@ -145,75 +168,203 @@ export const WasteImageClassifier = () => {
     reader.readAsDataURL(file);
   };
 
-  const updateUserPoints = async () => {
-    if (!user) return;
-
+  const startCamera = async () => {
     try {
-      const POINTS_FOR_CLASSIFICATION = 5;
-
-      // First, try to update existing points
-      const { data: existingPoints, error: fetchError } = await supabase
-        .from('user_points')
-        .select('total_points')
-        .eq('user_id', user.id)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching points:', fetchError);
+      console.log("Starting camera...");
+      // Check if browser supports getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("getUserMedia not supported");
+        toast({
+          title: "Camera Error",
+          description: "Your browser doesn't support camera access",
+          variant: "destructive",
+        });
         return;
       }
 
-      if (existingPoints) {
-        // Update existing points
-        const { error: updateError } = await supabase
-          .from('user_points')
-          .update({ total_points: existingPoints.total_points + POINTS_FOR_CLASSIFICATION })
-          .eq('user_id', user.id);
+      // Stop any existing stream first
+      await stopCamera();
 
-        if (updateError) {
-          console.error('Error updating points:', updateError);
-          return;
-        }
-      } else {
-        // Create new points record
-        const { error: insertError } = await supabase
-          .from('user_points')
-          .insert([
-            { user_id: user.id, total_points: POINTS_FOR_CLASSIFICATION }
-          ]);
+      console.log("Requesting camera access...");
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
 
-        if (insertError) {
-          console.error('Error inserting points:', insertError);
-          return;
-        }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("Camera access granted");
+
+      // Set camera active state before accessing video element
+      setIsCameraActive(true);
+      
+      // Small delay to ensure video element is mounted
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (!videoRef.current) {
+        console.error("Video element not found");
+        throw new Error("Video element not found");
       }
 
-      // Add to points history
-      const { error: historyError } = await supabase
-        .from('points_history')
-        .insert([
-          {
-            user_id: user.id,
-            points: POINTS_FOR_CLASSIFICATION,
-            action: 'Waste Classification',
-            description: 'Successfully classified waste through image upload'
+      videoRef.current.srcObject = stream;
+      videoRef.current.setAttribute('playsinline', 'true');
+      
+      // Wait for video to be ready
+      await new Promise<void>((resolve, reject) => {
+        if (!videoRef.current) {
+          reject(new Error("Video element not found"));
+          return;
+        }
+
+        const handleLoadedMetadata = async () => {
+          try {
+            await videoRef.current!.play();
+            console.log("Video stream started");
+            resolve();
+          } catch (error) {
+            console.error("Error playing video:", error);
+            reject(error);
           }
-        ]);
+        };
 
-      if (historyError) {
-        console.error('Error updating points history:', historyError);
-        return;
-      }
+        videoRef.current.onloadedmetadata = handleLoadedMetadata;
 
-      toast({
-        title: "Points Earned!",
-        description: `You earned ${POINTS_FOR_CLASSIFICATION} points for classifying waste!`,
+        // Add timeout to prevent hanging
+        setTimeout(() => {
+          reject(new Error("Video loading timeout"));
+        }, 10000);
       });
 
+      setCameraStream(stream);
+      
+      toast({
+        title: "Camera Active",
+        description: "You can now take a photo",
+      });
     } catch (error) {
-      console.error('Error in updateUserPoints:', error);
+      console.error("Error accessing camera:", error);
+      let errorMessage = "Could not access your camera. Please check permissions.";
+      
+      if (error instanceof DOMException) {
+        switch (error.name) {
+          case 'NotFoundError':
+          case 'DevicesNotFoundError':
+            errorMessage = 'No camera device found.';
+            break;
+          case 'NotAllowedError':
+          case 'PermissionDeniedError':
+            errorMessage = 'Camera permission denied. Please allow camera access.';
+            break;
+          case 'NotReadableError':
+          case 'TrackStartError':
+            errorMessage = 'Camera is already in use by another application.';
+            break;
+          case 'OverconstrainedError':
+            errorMessage = 'Could not find a suitable camera. Please try another device.';
+            break;
+          case 'TypeError':
+            errorMessage = 'No camera available or camera access not supported.';
+            break;
+        }
+      }
+      
+      toast({
+        title: "Camera Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      setIsCameraActive(false);
+      setCameraStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     }
   };
+
+  const stopCamera = async () => {
+    console.log("Stopping camera...");
+    try {
+      if (videoRef.current) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => {
+            track.stop();
+          });
+          videoRef.current.srcObject = null;
+        }
+      }
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => {
+          track.stop();
+        });
+      }
+      setCameraStream(null);
+      setIsCameraActive(false);
+      console.log("Camera stopped successfully");
+    } catch (error) {
+      console.error("Error stopping camera:", error);
+    }
+  };
+
+  const capturePhoto = () => {
+    console.log("Capturing photo...");
+    if (!videoRef.current || !videoRef.current.videoWidth) {
+      console.error("Video element not ready");
+      toast({
+        title: "Camera Error",
+        description: "Camera not ready. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error("Could not get canvas context");
+      }
+
+      if (videoRef.current) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        calculateImageHash(imageDataUrl).then(hash => {
+          setImageHash(hash);
+          setSelectedImage(imageDataUrl);
+          stopCamera();
+          setPrediction(null);
+          setWasteCategory(null);
+          setError(null);
+        });
+
+        console.log("Photo captured successfully");
+        toast({
+          title: "Photo Captured",
+          description: "You can now classify the waste item.",
+        });
+      }
+    } catch (error) {
+      console.error("Error capturing photo:", error);
+      toast({
+        title: "Capture Error",
+        description: "Failed to capture photo. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Clean up camera on component unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const classifyImage = async () => {
     if (!selectedImage || !model) return;
@@ -418,7 +569,7 @@ export const WasteImageClassifier = () => {
         });
 
         // After successful classification, update points
-        if (highestCategory && user) {
+        if (highestCategory && user && imageHash) {
           await updateUserPoints();
         }
       } catch (modelError) {
@@ -505,24 +656,104 @@ export const WasteImageClassifier = () => {
     return 'others';
   };
 
-  const getWasteDisposalGuidelines = (category: string): string => {
+  const getWasteDisposalGuidelines = (category: string): { guidelines: string; recyclable: boolean; impact: string; tips: string[] } => {
     switch (category) {
       case 'plastic':
-        return 'Clean and recycle in the blue bin. Remove caps and labels if possible.';
+        return {
+          guidelines: 'Clean and place in the blue recycling bin. Remove caps, labels, and rinse containers.',
+          recyclable: true,
+          impact: 'Plastic waste can take up to 1000 years to decompose. Recycling plastic reduces oil consumption and greenhouse gas emissions.',
+          tips: [
+            'Choose reusable containers over single-use plastics',
+            'Look for products with minimal plastic packaging',
+            'Properly clean plastics before recycling',
+            'Check recycling numbers (1-7) for proper sorting'
+          ]
+        };
       case 'paper':
-        return 'Recycle in the blue bin. Keep it clean and dry.';
+        return {
+          guidelines: 'Place clean, dry paper in the blue recycling bin. Shred sensitive documents.',
+          recyclable: true,
+          impact: 'Recycling paper saves trees, reduces water pollution, and uses 65% less energy than making new paper.',
+          tips: [
+            'Use both sides of paper when printing',
+            'Choose digital alternatives when possible',
+            'Keep paper dry and clean for recycling',
+            'Remove plastic windows from envelopes'
+          ]
+        };
       case 'glass':
-        return 'Clean and recycle in designated glass containers. Remove caps and lids.';
+        return {
+          guidelines: 'Rinse and place in designated glass recycling containers. Remove caps and lids.',
+          recyclable: true,
+          impact: 'Glass is 100% recyclable and can be recycled endlessly without loss in quality or purity.',
+          tips: [
+            'Sort glass by color when required',
+            'Remove metal or plastic lids',
+            'Rinse containers thoroughly',
+            'Never put broken glass in regular trash'
+          ]
+        };
       case 'metal':
-        return 'Rinse and recycle in the blue bin. Larger metal items should go to a recycling center.';
+        return {
+          guidelines: 'Clean and place in recycling bin. Large items should go to recycling centers.',
+          recyclable: true,
+          impact: 'Recycling metal saves up to 95% of the energy used to make new metal from raw materials.',
+          tips: [
+            'Crush cans to save space',
+            'Check if your local center accepts specific metals',
+            'Remove non-metal attachments',
+            'Keep metals separate from other recyclables'
+          ]
+        };
       case 'organic':
-        return 'Compost in the green bin. Keep free from plastics and other non-organic materials.';
+        return {
+          guidelines: 'Place in green composting bin or home compost. Keep free from non-organic materials.',
+          recyclable: true,
+          impact: 'Composting organic waste reduces methane emissions and creates nutrient-rich soil.',
+          tips: [
+            'Start a home composting system',
+            'Separate food scraps from other waste',
+            'Avoid mixing with non-biodegradable items',
+            'Use compost for gardening'
+          ]
+        };
       case 'wood':
-        return 'Clean wood can be recycled at specialized facilities. Treated wood may require special disposal.';
+        return {
+          guidelines: 'Clean wood can be recycled at specialized facilities. Treated wood requires special handling.',
+          recyclable: true,
+          impact: 'Recycling wood reduces deforestation and landfill waste while saving energy.',
+          tips: [
+            'Separate treated and untreated wood',
+            'Remove nails and metal fixtures',
+            'Consider repurposing or upcycling',
+            'Check local guidelines for treated wood'
+          ]
+        };
       case 'electronic':
-        return 'Take to an e-waste collection center. Do not dispose in regular trash.';
+        return {
+          guidelines: 'Take to certified e-waste recycling centers. Never dispose in regular trash.',
+          recyclable: true,
+          impact: 'E-waste contains toxic materials. Proper recycling prevents pollution and recovers valuable materials.',
+          tips: [
+            'Back up and wipe data before recycling',
+            'Look for manufacturer take-back programs',
+            'Keep batteries separate',
+            'Consider repairing before replacing'
+          ]
+        };
       default:
-        return 'If not recyclable, dispose in the general waste bin.';
+        return {
+          guidelines: 'Check local waste management guidelines for proper disposal.',
+          recyclable: false,
+          impact: 'Improper disposal of waste can harm the environment and wildlife.',
+          tips: [
+            'Try to reduce consumption',
+            'Look for reusable alternatives',
+            'Check with local authorities for disposal',
+            'Consider upcycling possibilities'
+          ]
+        };
     }
   };
 
@@ -539,172 +770,352 @@ export const WasteImageClassifier = () => {
     }
   };
 
+  const updateUserPoints = async () => {
+    if (!user || !imageHash) return;
+
+    try {
+      const POINTS_FOR_CLASSIFICATION = 5;
+
+      // Check if this image has been classified before
+      const { data: existingClassification, error: classificationError } = await supabase
+        .from('classified_images')
+        .select('id')
+        .eq('image_hash', imageHash)
+        .single();
+
+      if (classificationError && classificationError.code !== 'PGRST116') {
+        console.error('Error checking image classification:', classificationError);
+        return;
+      }
+
+      if (existingClassification) {
+        toast({
+          title: "Already Classified",
+          description: "This image has already been classified. No points awarded.",
+          variant: "default",
+        });
+        return;
+      }
+
+      // Record the image classification
+      const { error: insertImageError } = await supabase
+        .from('classified_images')
+        .insert([
+          {
+            user_id: user.id,
+            image_hash: imageHash,
+            category: wasteCategory
+          }
+        ]);
+
+      if (insertImageError) {
+        console.error('Error recording image classification:', insertImageError);
+        return;
+      }
+
+      // Update user points
+      const { data: existingPoints, error: fetchError } = await supabase
+        .from('user_points')
+        .select('total_points')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching points:', fetchError);
+        return;
+      }
+
+      if (existingPoints) {
+        const { error: updateError } = await supabase
+          .from('user_points')
+          .update({ total_points: existingPoints.total_points + POINTS_FOR_CLASSIFICATION })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('Error updating points:', updateError);
+          return;
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from('user_points')
+          .insert([
+            { user_id: user.id, total_points: POINTS_FOR_CLASSIFICATION }
+          ]);
+
+        if (insertError) {
+          console.error('Error inserting points:', insertError);
+          return;
+        }
+      }
+
+      // Add to points history
+      const { error: historyError } = await supabase
+        .from('points_history')
+        .insert([
+          {
+            user_id: user.id,
+            points: POINTS_FOR_CLASSIFICATION,
+            action: 'Waste Classification',
+            description: 'Successfully classified waste through image upload'
+          }
+        ]);
+
+      if (historyError) {
+        console.error('Error updating points history:', historyError);
+        return;
+      }
+
+      toast({
+        title: "Points Earned!",
+        description: `You earned ${POINTS_FOR_CLASSIFICATION} points for classifying waste!`,
+      });
+
+    } catch (error) {
+      console.error('Error in updateUserPoints:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <Card className="overflow-hidden shadow-lg border-2 hover:border-primary/50 transition-all duration-300">
-            <CardHeader className="bg-gradient-to-r from-primary/80 to-secondary/80 text-white">
-              <CardTitle className="flex items-center">
-                <Brain className="mr-2 h-5 w-5" />
-                Waste Image Classifier
-              </CardTitle>
-              <CardDescription className="text-white/90">
-                Upload a photo of waste to identify its category
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="p-6">
-              <div className="mb-6">
-                <label 
-                  htmlFor="image-upload" 
-                  className="block w-full p-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:bg-gray-50 transition-all duration-300 bg-white"
-                >
+        <Card className="overflow-hidden shadow-lg border-2 hover:border-primary/50 transition-all duration-300">
+          <CardHeader className="bg-gradient-to-r from-primary/80 to-secondary/80 text-white">
+            <CardTitle className="flex items-center">
+              <Brain className="mr-2 h-5 w-5" />
+              Waste Image Classifier
+            </CardTitle>
+            <CardDescription className="text-white/90">
+              Upload or capture a photo of waste to identify its category
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="p-6">
+            <div className="mb-6">
+              {isCameraActive ? (
+                <div className="space-y-4">
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                      style={{
+                        transform: 'scaleX(1)',
+                        maxWidth: '100%',
+                        maxHeight: '100%'
+                      }}
+                    />
+                    {!cameraStream && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <Loader className="h-8 w-8 animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    <Button 
+                      variant="outline"
+                      onClick={() => stopCamera()}
+                      className="w-full md:w-auto"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={capturePhoto}
+                      className="w-full md:w-auto"
+                      disabled={!cameraStream}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Take Photo
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
                   {selectedImage ? (
-                    <div>
+                    <div className="relative">
                       <img 
                         src={selectedImage} 
                         alt="Selected" 
                         className="mx-auto h-48 object-contain mb-4 rounded-md shadow-sm"
                       />
-                      <p className="text-sm text-muted-foreground">Click to change image</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => setSelectedImage(null)}
+                      >
+                        Change
+                      </Button>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center">
-                      <Upload className="w-12 h-12 text-primary mb-3" />
-                      <p className="text-base font-medium">Click to upload waste image</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        or drag and drop image here
-                      </p>
-                    </div>
-                  )}
-                  <input 
-                    id="image-upload"
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                    className="hidden"
-                  />
-                </label>
-              </div>
-              
-              <div className="flex flex-col space-y-4">
-                <Button 
-                  onClick={classifyImage} 
-                  disabled={!selectedImage || loading}
-                  className="w-full"
-                >
-                  {loading ? (
                     <>
-                      <Loader className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <ImageIcon className="mr-2 h-4 w-4" />
-                      Classify Waste
-                    </>
-                  )}
-                </Button>
-                
-                <Button 
-                  onClick={trainModel} 
-                  disabled={modelTraining || !model} 
-                  variant="outline"
-                  className="w-full"
-                >
-                  {modelTraining ? (
-                    <>
-                      <Loader className="mr-2 h-4 w-4 animate-spin" />
-                      Training ({Math.round(trainingProgress * 100)}%)
-                    </>
-                  ) : (
-                    <>
-                      <Brain className="mr-2 h-4 w-4" />
-                      Train Model
+                      <label 
+                        htmlFor="image-upload" 
+                        className="block w-full p-6 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:bg-gray-50 transition-all duration-300 bg-white"
+                      >
+                        <div className="flex flex-col items-center">
+                          <Upload className="w-12 h-12 text-primary mb-3" />
+                          <p className="text-base font-medium">Click to upload waste image</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            or drag and drop image here
+                          </p>
+                        </div>
+                        <input 
+                          id="image-upload"
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleImageUpload} 
+                          className="hidden"
+                        />
+                      </label>
+
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300" />
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-2 bg-background text-muted-foreground">or</span>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={startCamera}
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Use Camera
+                      </Button>
                     </>
                   )}
-                </Button>
-              </div>
-              
-              {error && (
-                <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  {error}
                 </div>
               )}
+            </div>
+            
+            <div className="flex flex-col space-y-4">
+              <Button 
+                onClick={classifyImage} 
+                disabled={!selectedImage || loading}
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Classify Waste
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                onClick={trainModel} 
+                disabled={modelTraining || !model} 
+                variant="outline"
+                className="w-full"
+              >
+                {modelTraining ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Training ({Math.round(trainingProgress * 100)}%)
+                  </>
+                ) : (
+                  <>
+                    <Brain className="mr-2 h-4 w-4" />
+                    Train Model
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                {error}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {wasteCategory ? (
+          <Card className="h-full shadow-lg border-2 hover:border-primary/50 transition-all duration-300">
+            <CardHeader className={`text-white ${getCategoryColor(wasteCategory)}`}>
+              <CardTitle className="flex items-center">
+                <div className="p-2 bg-white/20 rounded-full mr-3">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                {wasteCategory?.charAt(0).toUpperCase() + wasteCategory?.slice(1)} Waste
+              </CardTitle>
+              <CardDescription className="text-white/90">
+                {getWasteDisposalGuidelines(wasteCategory).recyclable ? 
+                  '♻️ Recyclable Material' : 
+                  '⚠️ Special Disposal Required'}
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-2 flex items-center">
+                  <Trash2 className="h-5 w-5 mr-2 text-primary" />
+                  Disposal Guidelines
+                </h3>
+                <p className="text-muted-foreground p-3 bg-muted rounded-md">
+                  {getWasteDisposalGuidelines(wasteCategory).guidelines}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-md font-medium mb-2 flex items-center">
+                  <Info className="h-5 w-5 mr-2 text-primary" />
+                  Environmental Impact
+                </h3>
+                <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                  {getWasteDisposalGuidelines(wasteCategory).impact}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-md font-medium mb-2 flex items-center">
+                  <Brain className="h-5 w-5 mr-2 text-primary" />
+                  Waste Reduction Tips
+                </h3>
+                <ul className="space-y-2">
+                  {getWasteDisposalGuidelines(wasteCategory).tips.map((tip, index) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-start">
+                      <span className="mr-2">•</span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </CardContent>
           </Card>
-        </div>
-        
-        <div>
-          {wasteCategory ? (
-            <Card className="h-full shadow-lg border-2 hover:border-primary/50 transition-all duration-300">
-              <CardHeader className={`text-white ${getCategoryColor(wasteCategory)}`}>
-                <CardTitle className="flex items-center">
-                  <div className="p-2 bg-white/20 rounded-full mr-3">
-                    <CheckCircle2 className="h-5 w-5" />
-                  </div>
-                  Waste Identified: {wasteCategory.charAt(0).toUpperCase() + wasteCategory.slice(1)}
-                </CardTitle>
-                <CardDescription className="text-white/90">
-                  {prediction?.className || 'Unknown object'}
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-medium mb-2 flex items-center">
-                    <Trash2 className="h-5 w-5 mr-2 text-primary" />
-                    Disposal Guidelines
-                  </h3>
-                  <p className="text-muted-foreground p-3 bg-muted rounded-md">
-                    {getWasteDisposalGuidelines(wasteCategory)}
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-muted rounded-lg mt-4">
-                  <h3 className="text-md font-medium mb-2 flex items-center">
-                    <Info className="h-5 w-5 mr-2 text-primary" />
-                    Environmental Impact
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Proper segregation and disposal of {wasteCategory} waste helps reduce landfill waste and conserves natural resources.
-                  </p>
-                </div>
-              </CardContent>
-              
-              <CardFooter className="bg-muted p-4 border-t">
-                <p className="text-xs text-center w-full text-muted-foreground">
-                  Classification confidence: {prediction?.probability 
-                    ? `${(prediction.probability * 100).toFixed(2)}%` 
-                    : 'Unknown'}
-                </p>
-              </CardFooter>
-            </Card>
-          ) : (
-            <Card className="h-full flex flex-col justify-center shadow-lg border-2 hover:border-primary/50 transition-all duration-300">
-              <CardContent className="p-10 text-center">
-                <div className="w-20 h-20 bg-primary/10 rounded-full mx-auto flex items-center justify-center mb-4">
-                  <ImageIcon className="h-10 w-10 text-primary" />
-                </div>
-                <h3 className="text-xl font-medium mb-2">No Image Classified</h3>
-                <p className="text-muted-foreground mb-6">
-                  Upload an image and click "Classify Waste" to identify what type of waste it is and how to dispose of it properly.
-                </p>
-                <div className="grid grid-cols-3 gap-3 mt-6">
-                  <WasteCategoryBadge category="plastic" color="bg-eco-plastic" />
-                  <WasteCategoryBadge category="paper" color="bg-eco-paper" />
-                  <WasteCategoryBadge category="glass" color="bg-eco-glass" />
-                  <WasteCategoryBadge category="metal" color="bg-eco-metal" />
-                  <WasteCategoryBadge category="organic" color="bg-eco-leaf" />
-                  <WasteCategoryBadge category="wood" color="bg-amber-700" />
-                  <WasteCategoryBadge category="electronic" color="bg-blue-400" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        ) : (
+          <Card className="h-full flex flex-col justify-center shadow-lg border-2 hover:border-primary/50 transition-all duration-300">
+            <CardContent className="p-10 text-center">
+              <div className="w-20 h-20 bg-primary/10 rounded-full mx-auto flex items-center justify-center mb-4">
+                <ImageIcon className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="text-xl font-medium mb-2">No Image Classified</h3>
+              <p className="text-muted-foreground mb-6">
+                Upload an image and click 'Classify Waste' to identify what type of waste it is.
+              </p>
+              <div className="grid grid-cols-3 gap-3 mt-6">
+                <WasteCategoryBadge category="plastic" color="bg-eco-plastic" />
+                <WasteCategoryBadge category="paper" color="bg-eco-paper" />
+                <WasteCategoryBadge category="glass" color="bg-eco-glass" />
+                <WasteCategoryBadge category="metal" color="bg-eco-metal" />
+                <WasteCategoryBadge category="organic" color="bg-eco-leaf" />
+                <WasteCategoryBadge category="wood" color="bg-amber-700" />
+                <WasteCategoryBadge category="electronic" color="bg-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
       
       <div className="mt-8">
@@ -720,8 +1131,8 @@ export const WasteImageClassifier = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StepCard 
                 number={1} 
-                title="Upload Image" 
-                description="Take a photo or upload an image of the waste item you want to classify." 
+                title="Upload Image"
+                description="Upload an image of the waste item you want to classify."
               />
               <StepCard 
                 number={2} 
@@ -741,7 +1152,12 @@ export const WasteImageClassifier = () => {
   );
 };
 
-const WasteCategoryBadge = ({ category, color }: { category: string; color: string }) => {
+interface WasteCategoryBadgeProps {
+  category: string;
+  color: string;
+}
+
+const WasteCategoryBadge = ({ category, color }: WasteCategoryBadgeProps) => {
   return (
     <div className={`p-2 rounded-lg ${color} text-white text-center shadow-sm`}>
       <p className="text-xs font-medium">{category.charAt(0).toUpperCase() + category.slice(1)}</p>
@@ -749,7 +1165,13 @@ const WasteCategoryBadge = ({ category, color }: { category: string; color: stri
   );
 };
 
-const StepCard = ({ number, title, description }: { number: number; title: string; description: string }) => {
+interface StepCardProps {
+  number: number;
+  title: string;
+  description: string;
+}
+
+const StepCard = ({ number, title, description }: StepCardProps) => {
   return (
     <div className="p-4 border rounded-lg flex bg-white shadow-sm hover:shadow-md transition-all duration-300">
       <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mr-3 shrink-0">

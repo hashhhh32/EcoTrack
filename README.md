@@ -1,4 +1,4 @@
-# EcoTrack - Sustainable Waste Management Platform 🌱
+# EcoTrack - Sustainable Waste Management Platform 🌱 - ecotrrack.netlify.app
 
 EcoTrack is a modern, full-stack web application designed to promote and facilitate sustainable waste management practices. The platform combines environmental consciousness with user engagement through various interactive features and community-driven initiatives.
 
